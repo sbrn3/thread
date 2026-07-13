@@ -43,9 +43,20 @@ npm run typecheck  # tsc --noEmit, strict
 - `/src/lab` never imports `/src/ui`; `/src/memory` never imports `/src/lab`;
   `/src/partner` has no code path to a network.
 
+## Install on the phone (Android)
+
+Every push to `main` builds `thread.apk` in GitHub Actions (Actions → latest
+run → Artifacts). Tagging a version publishes it under **Releases**:
+
+```sh
+git tag v0.1.0 && git push --tags
+```
+
+Then on the phone: open the repo's Releases page, download `thread.apk`,
+and allow the install ("install unknown apps"). Updates install over the
+old version — the signing key is stable across builds.
+
 ## What's still needed (see plan §07, §13)
 
 1. **Bundled translation** — a WEB (public domain) JSON for `/assets/bible`.
-2. **Dev build** — `npx eas build --profile development` (needs a free Expo
-   account) or `npx expo run:android` locally with Android Studio.
-3. **NIV (optional, Path A)** — an API.Bible key; add `ApiBibleProvider`.
+2. **NIV (optional, Path A)** — an API.Bible key; add `ApiBibleProvider`.

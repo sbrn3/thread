@@ -1,0 +1,68 @@
+# Builds an installable release APK on every push to main and attaches
+# it to a GitHub Release on version tags (v1.0.0, v1.1.0, ...).
+#
+# Download: repo → Releases → thread.apk (tags), or Actions → run →
+# Artifacts (any push). Sideload on the phone; no store, no EAS.
+#
+# Signing: Expo's generated project signs release builds with the
+# standard debug keystore, which is stable across builds — so updates
+# install over the old version. Fine for a one-person app distributed
+# to a handful of friends (plan §18); swap in a real keystore via
+# repo secrets if that ever changes.
+
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Simulation suite + typecheck (gate — the log is the irreplaceable asset)
+        run: |
+          npm test
+          npm run typecheck
+
+      - name: Generate native project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: android
+        env:
+          # Stamped into every event row (§13.2)
+          EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk thread.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thread-apk
+          path: thread.apk
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: thread.apk
+          generate_release_notes: true

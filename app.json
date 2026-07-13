@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "thread",
+    "name": "Thread",
     "slug": "thread",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,6 +10,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.sngugi.thread",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
