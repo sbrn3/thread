@@ -35,6 +35,7 @@ beforeEach(() => {
     attribution: null,
     daysInBook: 1,
     justFinishedBook: null,
+    nextBookNeeded: false,
   });
 });
 
@@ -81,7 +82,25 @@ describe('session store — book selection (§05 onboarding-set, defensive fallb
     expect(meta.get(db, 'current_chapter')).toBe('1');
   });
 
-  it('re-seeds next_book after consuming it, so the queue stays one deep', async () => {
+  it('clears the queue after consuming it and flags nextBookNeeded — the user picks, the app never auto-refills', async () => {
+    const { db, log, text } = setup();
+    meta.set(db, 'current_book', 'philemon');
+    meta.set(db, 'current_chapter', '1');
+    meta.set(db, 'current_sitting', '0');
+    meta.set(db, 'book_started_local_date', '2026-07-14');
+    meta.set(db, 'next_book', 'james');
+
+    await useSession.getState().load(db, log, text, '2026-07-14');
+    expect(useSession.getState().nextBookNeeded).toBe(false); // queue was full before finishing
+
+    await useSession.getState().seal(db, log, text, '2026-07-14');
+
+    expect(meta.get(db, 'current_book')).toBe('james');
+    expect(meta.get(db, 'next_book')).toBeFalsy(); // consumed, not silently re-filled
+    expect(useSession.getState().nextBookNeeded).toBe(true);
+  });
+
+  it('pickNextBook fills the queue and clears nextBookNeeded', async () => {
     const { db, log, text } = setup();
     meta.set(db, 'current_book', 'philemon');
     meta.set(db, 'current_chapter', '1');
@@ -91,13 +110,26 @@ describe('session store — book selection (§05 onboarding-set, defensive fallb
 
     await useSession.getState().load(db, log, text, '2026-07-14');
     await useSession.getState().seal(db, log, text, '2026-07-14');
+    expect(useSession.getState().nextBookNeeded).toBe(true);
 
-    expect(meta.get(db, 'current_book')).toBe('james');
-    expect(meta.get(db, 'next_book')).not.toBeNull();
-    expect(meta.get(db, 'next_book')).not.toBe('james'); // re-seeded to something after james, not left stale
+    useSession.getState().pickNextBook(db, 'romans');
+
+    expect(meta.get(db, 'next_book')).toBe('romans');
+    expect(useSession.getState().nextBookNeeded).toBe(false);
   });
 
-  it('falls back to canon order when next_book was never queued (defensive path)', async () => {
+  it('nextBookNeeded persists across a load() — a skipped pick isn\'t forgotten the next day', async () => {
+    const { db, log, text } = setup();
+    meta.set(db, 'current_book', 'james'); // as if book_finish already ran and next_book was left empty
+    meta.set(db, 'current_chapter', '1');
+    meta.set(db, 'current_sitting', '0');
+    meta.set(db, 'book_started_local_date', '2026-07-14');
+
+    await useSession.getState().load(db, log, text, '2026-07-15');
+    expect(useSession.getState().nextBookNeeded).toBe(true);
+  });
+
+  it('falls back to canon order for the CURRENT book when next_book was never queued (defensive path only)', async () => {
     const { db, log, text } = setup();
     meta.set(db, 'current_book', 'philemon');
     meta.set(db, 'current_chapter', '1');
@@ -109,5 +141,6 @@ describe('session store — book selection (§05 onboarding-set, defensive fallb
     await useSession.getState().seal(db, log, text, '2026-07-14');
 
     expect(meta.get(db, 'current_book')).toBe('hebrews'); // canon order after Philemon
+    expect(useSession.getState().nextBookNeeded).toBe(true); // still needs a real pick going forward
   });
 });

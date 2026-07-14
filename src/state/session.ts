@@ -23,9 +23,12 @@ export interface SessionState {
   attribution: string | null;
   daysInBook: number;
   justFinishedBook: string | null; // set for one render after book_finish, for the dismissal copy
+  /** True whenever the queue is empty — persists across sessions until the user actually picks (§04). */
+  nextBookNeeded: boolean;
 
   load(db: SqlDb, log: Log, text: TextProvider, today: string): Promise<void>;
   seal(db: SqlDb, log: Log, text: TextProvider, today: string): Promise<void>;
+  pickNextBook(db: SqlDb, bookId: string): void;
 }
 
 function daysBetweenInclusive(from: string, to: string): number {
@@ -49,6 +52,7 @@ export const useSession = create<SessionState>((set, get) => ({
   attribution: null,
   daysInBook: 1,
   justFinishedBook: null,
+  nextBookNeeded: false,
 
   async load(db, log, text, today) {
     set({ loading: true });
@@ -86,6 +90,7 @@ export const useSession = create<SessionState>((set, get) => ({
       attribution: text.attribution(),
       daysInBook: daysBetweenInclusive(bookStarted ?? today, today),
       justFinishedBook: null,
+      nextBookNeeded: !meta.get(db, 'next_book'),
     });
   },
 
@@ -119,21 +124,18 @@ export const useSession = create<SessionState>((set, get) => ({
         finishedBook = book;
         // §05 onboarding queues the next book one deep; consume it
         // here. Canon order is only a defensive fallback for the
-        // onboarding-bypassed case (see module comment above).
+        // onboarding-bypassed case (see module comment above) — it is
+        // NOT re-applied automatically after this: the queue is left
+        // empty and nextBookNeeded is set, so the user picks the next
+        // one themselves (§04) instead of the app silently choosing.
         const queued = meta.get(db, 'next_book');
-        const next = queued ?? nextBook(book)?.id ?? null;
+        const next = queued || nextBook(book)?.id || null;
         nextBookId = next ?? book; // stays on the last book if the canon is exhausted
         nextChapter = 1;
         nextSittingIndex = 0;
         bookStarted = today;
-        if (next) {
-          log.write({ type: 'book_start', book: nextBookId, chapter: 1 });
-          // Re-seed the queue so it stays one deep — a placeholder
-          // pick (canon order) until the dismissal zone offers a real
-          // re-pick, which is deferred past this pass.
-          const reseed = nextBook(nextBookId)?.id;
-          if (reseed) meta.set(db, 'next_book', reseed);
-        }
+        meta.set(db, 'next_book', ''); // consumed — the queue is empty until the user re-fills it
+        if (next) log.write({ type: 'book_start', book: nextBookId, chapter: 1 });
       }
     }
 
@@ -142,6 +144,15 @@ export const useSession = create<SessionState>((set, get) => ({
     meta.set(db, 'current_sitting', String(nextSittingIndex));
     meta.set(db, 'book_started_local_date', bookStarted);
 
-    set({ sealedToday: true, justFinishedBook: finishedBook });
+    set({
+      sealedToday: true,
+      justFinishedBook: finishedBook,
+      nextBookNeeded: finishedBook !== null || get().nextBookNeeded,
+    });
+  },
+
+  pickNextBook(db, bookId) {
+    meta.set(db, 'next_book', bookId);
+    set({ nextBookNeeded: false });
   },
 }));

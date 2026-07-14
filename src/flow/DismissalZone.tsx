@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { bookName } from '../text/canon';
 import type { Passage } from '../log/types';
+import { bookName } from '../text/canon';
+import { BookPicker } from '../ui/BookPicker';
 import { tokens } from '../ui/tokens';
 
 interface DismissalZoneProps {
@@ -11,6 +13,9 @@ interface DismissalZoneProps {
   /** Unpromoted candidates from the just-finished book (§21) — offered once, at book end. */
   candidates: Passage[];
   onPromote: (id: number) => void;
+  /** True whenever the next-book queue is empty (§04) — persists across days until picked, not gated by justFinishedBook. */
+  needsNextBookPick: boolean;
+  onPickNextBook: (bookId: string) => void;
 }
 
 function reference(book: string, p: Passage): string {
@@ -21,7 +26,10 @@ function reference(book: string, p: Passage): string {
 // §04 zone 5 — deliberately terminal. Engagement is not the goal;
 // the reading is, and it happens off-screen. Book-end promotion
 // (§21, W5): of everything marked while reading this book, choose
-// exactly one to carry forward into the Leitner schedule.
+// exactly one to carry forward into the Leitner schedule. The
+// next-book queue (§04) is refilled by the user here, never
+// auto-picked — a finished book must not become a decision point,
+// but it also must not become the app's decision instead of yours.
 export function DismissalZone({
   book,
   chapter,
@@ -29,7 +37,10 @@ export function DismissalZone({
   justFinishedBook,
   candidates,
   onPromote,
+  needsNextBookPick,
+  onPickNextBook,
 }: DismissalZoneProps) {
+  const [pending, setPending] = useState<string | null>(null);
   const pct = chapterCount > 0 ? Math.round((chapter / chapterCount) * 100) : 0;
 
   return (
@@ -50,6 +61,18 @@ export function DismissalZone({
               <Text style={styles.candidateText}>{reference(justFinishedBook, p)}</Text>
             </Pressable>
           ))}
+        </View>
+      )}
+
+      {needsNextBookPick && (
+        <View style={styles.queueBlock}>
+          <Text style={styles.promoteLabel}>What&apos;s next, after {bookName(book)}?</Text>
+          <BookPicker excludeId={book} selected={pending} onSelect={setPending} />
+          {pending && (
+            <Pressable style={styles.queueBtn} onPress={() => onPickNextBook(pending)}>
+              <Text style={styles.queueBtnLabel}>Queue {bookName(pending)}</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -102,6 +125,24 @@ const styles = StyleSheet.create({
     fontFamily: tokens.font.display,
     fontSize: 14,
     color: tokens.color.ink,
+  },
+  queueBlock: {
+    width: '100%',
+    gap: 8,
+  },
+  queueBtn: {
+    marginTop: 8,
+    alignSelf: 'center',
+    backgroundColor: tokens.color.ink,
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  queueBtnLabel: {
+    fontFamily: tokens.font.display,
+    fontWeight: '700',
+    fontSize: 13,
+    color: tokens.color.paper,
   },
   close: {
     fontFamily: tokens.font.scripture,

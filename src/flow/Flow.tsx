@@ -158,6 +158,13 @@ export function Flow({ services }: FlowProps) {
     [memory, today],
   );
 
+  const handlePickNextBook = useCallback(
+    (bookId: string) => {
+      session.pickNextBook(db, bookId);
+    },
+    [session, db],
+  );
+
   // §04 zone 1b — only if due; the zone does not exist otherwise.
   const [dueToday, setDueToday] = useState<Passage[]>([]);
   const recallShownLogged = useRef(false);
@@ -262,6 +269,8 @@ export function Flow({ services }: FlowProps) {
               justFinishedBook={session.justFinishedBook}
               candidates={candidates}
               onPromote={handlePromote}
+              needsNextBookPick={session.nextBookNeeded}
+              onPickNextBook={handlePickNextBook}
             />
           </>
         )}
