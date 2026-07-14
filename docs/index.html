@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thread — a Bible reading app for one person</title>
+<meta name="description" content="A Bible reading app for one person — no streaks, no plans to browse, one flow from cue to seal.">
+<meta property="og:title" content="Thread — a Bible reading app for one person">
+<meta property="og:description" content="A Bible reading app for one person — no streaks, no plans to browse, one flow from cue to seal.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FBFAF7; --ink: #16161A; --thread: #1F3FFF;
+    --ink60: #5E5D66; --ink40: #9C9BA3; --ink15: #E6E5E1; --blue-soft: #EEF0FF;
+    --display: 'Schibsted Grotesk', system-ui, sans-serif;
+    --scripture: 'Newsreader', Georgia, serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--display); overflow-x: hidden; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  main { position: relative; }
+
+  .btn {
+    display: inline-block; text-decoration: none; cursor: pointer;
+    font: 600 15px/1 var(--display); padding: 14px 28px; border-radius: 999px;
+    border: 1px solid var(--ink); color: var(--ink); background: transparent;
+    transition: background .18s, color .18s, transform .18s;
+  }
+  .btn:hover { background: var(--ink); color: var(--paper); transform: translateY(-1px); }
+  .btn.primary { background: var(--thread); border-color: var(--thread); color: #fff; }
+  .btn.primary:hover { background: var(--ink); border-color: var(--ink); }
+  .kicker { font: 600 11px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--thread); }
+
+  /* the needle: one thread sewn through the whole page */
+  .needle-svg { position: absolute; top: 0; left: 0; width: 100%; z-index: 1; pointer-events: none; }
+  .needle-svg .ghost { fill: none; stroke: var(--ink15); stroke-width: 1.5; }
+  .needle-svg .sewn { fill: none; stroke: var(--thread); stroke-width: 2.5; stroke-linecap: round; }
+  .stage { position: relative; z-index: 2; }
+
+  .rv { opacity: 0; transform: translateY(26px); transition: opacity .8s cubic-bezier(.2,.6,.2,1), transform .8s cubic-bezier(.2,.6,.2,1); }
+  .rv.in { opacity: 1; transform: none; }
+  .rv.d1 { transition-delay: .12s; } .rv.d2 { transition-delay: .24s; } .rv.d3 { transition-delay: .36s; }
+  @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; } }
+
+  /* ---- hero (Ink: masked line-rise type) ---- */
+  .hero { min-height: 96vh; display: flex; flex-direction: column; justify-content: center; max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+  .line-mask { overflow: hidden; }
+  .line-mask span { display: block; transform: translateY(110%); animation: rise 1s cubic-bezier(.2,.7,.15,1) forwards; }
+  .line-mask:nth-child(2) span { animation-delay: .1s; }
+  .line-mask:nth-child(3) span { animation-delay: .2s; }
+  @keyframes rise { to { transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .line-mask span { transform: none; } }
+  .hero h1 { font: 900 clamp(52px, 9.5vw, 128px)/1.0 var(--display); letter-spacing: -.038em; }
+  .hero h1 .serif { font-family: var(--scripture); font-weight: 500; font-style: italic; letter-spacing: -.01em; color: var(--thread); }
+  .hero .sub { font: 400 17px/1.6 var(--scripture); color: var(--ink60); max-width: 460px; margin-top: 30px; }
+  .hero .scroll-cue { font: 400 12px/1 var(--mono); color: var(--ink40); margin-top: 52px; }
+
+  /* ---- thesis panel (Needle: right-anchored, quote card) ---- */
+  .thesis { min-height: 62vh; display: flex; align-items: center; justify-content: flex-end; max-width: 1100px; margin: 0 auto; padding: 6vh 40px; }
+  .thesis-box { max-width: 560px; text-align: right; }
+  .thesis-box h2 { font: 800 clamp(28px, 4.4vw, 46px)/1.15 var(--display); letter-spacing: -.02em; margin-top: 14px; }
+  .thesis-box p { font: 400 17px/1.7 var(--scripture); color: var(--ink60); margin-top: 16px; }
+  .thesis-box p strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- ritual: performed zones ---- */
+  .zone-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .zone-tag { font: 600 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--ink40); }
+  .zone-tag b { color: var(--thread); font-weight: 600; }
+  .knot-fixed { position: fixed; top: 46px; right: 24px; z-index: 50; width: 24px; height: 24px; border: 1.5px solid var(--ink40); border-radius: 50%; }
+  .knot-fixed::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: var(--ink40); }
+
+  .chapter { min-height: 92vh; display: flex; align-items: center; max-width: 780px; margin: 0 auto; padding: 8vh 40px; }
+  .chapter.center { justify-content: center; text-align: center; flex-direction: column; }
+
+  .c-arrival .day { font: 600 12px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink40); }
+  .c-arrival h2 { font: 800 clamp(38px, 6vw, 68px)/1.05 var(--display); letter-spacing: -.03em; margin: 18px 0 26px; }
+  .cue-line { font: italic 400 clamp(19px, 2.8vw, 27px)/1.6 var(--scripture); color: var(--ink60); min-height: 3.2em; }
+  .cue-line .blank { color: var(--thread); border-bottom: 2px solid var(--thread); font-style: italic; white-space: pre; }
+  .cue-line .caret { display: inline-block; width: 2px; height: 1em; background: var(--thread); vertical-align: -0.15em; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .tapnote { font: 400 12px/1 var(--mono); color: var(--ink40); margin-top: 22px; }
+
+  .c-recall .refbig { font: 800 clamp(38px, 6vw, 64px)/1.05 var(--display); letter-spacing: -.025em; margin: 14px 0 24px; }
+  .grade-row { display: flex; gap: 10px; margin-top: 28px; flex-wrap: wrap; }
+  .grade { font: 600 14px/1 var(--display); padding: 12px 20px; border-radius: 999px; border: 1px solid var(--ink15); color: var(--ink60); cursor: pointer; background: transparent; transition: border-color .15s, color .15s, background .15s; }
+  .grade:hover { border-color: var(--thread); color: var(--thread); background: var(--blue-soft); }
+  .reveal-box { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .7s ease, opacity .7s ease; }
+  .reveal-box.open { max-height: 300px; opacity: 1; }
+  .reveal-box blockquote { font: 400 19px/1.7 var(--scripture); border-left: 2px solid var(--ink15); padding-left: 20px; margin-top: 20px; }
+
+  .c-scripture .verse { font: 400 clamp(18px, 2.1vw, 22px)/1.8 var(--scripture); margin-bottom: 16px; }
+  .c-scripture .vn { font: 600 10px var(--mono); color: var(--thread); vertical-align: super; margin-right: 6px; }
+  .c-scripture .verse.sweep {
+    background-image: linear-gradient(var(--blue-soft), var(--blue-soft));
+    background-repeat: no-repeat; background-size: 0% 100%;
+    transition: background-size 1.4s cubic-bezier(.25,.5,.25,1);
+    border-radius: 4px; padding: 2px 6px; margin-left: -6px;
+  }
+  .c-scripture .verse.sweep.in-sweep { background-size: 100% 100%; }
+
+  .seal-btn { width: 156px; height: 156px; margin: 32px auto 0; border-radius: 50%; border: 0; background: transparent; cursor: pointer; position: relative; display: block; -webkit-tap-highlight-color: transparent; touch-action: none; }
+  .seal-btn svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .seal-btn .track { fill: none; stroke: var(--ink15); stroke-width: 4; }
+  .seal-btn .prog { fill: none; stroke: var(--thread); stroke-width: 4; stroke-linecap: round; }
+  .seal-btn .core { position: absolute; inset: 37px; border-radius: 50%; background: var(--ink); transition: background .25s, transform .25s; }
+  .seal-btn:active .core { transform: scale(.96); }
+  .seal-btn.sealed .core { background: var(--thread); }
+  .seal-hint { font: 400 13px/1.6 var(--mono); color: var(--ink40); margin-top: 22px; }
+
+  .c-weave .weave { display: grid; grid-template-columns: repeat(15, 1fr); gap: 7px; margin-top: 30px; max-width: 620px; }
+  .c-weave .weave i { display: block; height: 24px; border-radius: 2px; background: var(--thread); opacity: .85; transform: scaleX(0); transform-origin: left; transition: transform .5s cubic-bezier(.2,.7,.2,1); }
+  .c-weave .weave i.gap { background: transparent; border: 1px dashed var(--ink15); transform: none; }
+  .c-weave.woven .weave i { transform: scaleX(1); }
+  .c-weave p.body { font: 400 17px/1.7 var(--scripture); color: var(--ink60); margin-top: 14px; max-width: 560px; }
+  .c-weave p.body strong { color: var(--ink); font-weight: 600; }
+
+  .locked { opacity: .35; pointer-events: none; transition: opacity .6s; filter: saturate(.4); }
+  .locked.unlocked { opacity: 1; pointer-events: auto; filter: none; }
+
+  .c-dismiss .closer { font: 800 clamp(30px, 5vw, 48px)/1.15 var(--display); letter-spacing: -.02em; }
+  .c-dismiss .cta-row { display: flex; gap: 14px; justify-content: center; margin-top: 36px; flex-wrap: wrap; }
+  .c-dismiss .fine { font: 400 12px/1.9 var(--mono); color: var(--ink40); margin-top: 30px; }
+
+  @media (max-width: 760px) {
+    .thesis { justify-content: flex-start; }
+    .thesis-box { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <svg class="needle-svg" id="needleSvg" aria-hidden="true">
+    <path class="ghost" id="needleGhost" d=""></path>
+    <path class="sewn" id="needleSewn" d=""></path>
+  </svg>
+  <div class="knot-fixed" aria-hidden="true"></div>
+
+  <div class="stage">
+
+    <!-- HERO -->
+    <section class="hero" data-anchor="0.5">
+      <h1>
+        <span class="line-mask"><span>Not a streak.</span></span>
+        <span class="line-mask"><span>Not a plan.</span></span>
+        <span class="line-mask"><span class="serif">A thread.</span></span>
+      </h1>
+      <p class="sub">A Bible reading app for one person. Scroll — this page reads the way the app works: one continuous thread, one flow, no navigation.</p>
+      <p class="scroll-cue">↓</p>
+    </section>
+
+    <!-- THESIS -->
+    <section class="thesis" data-anchor="0.85">
+      <div class="thesis-box">
+        <p class="kicker rv">the thesis</p>
+        <h2 class="rv d1">Bible reading fails at the cue, not at motivation.</h2>
+        <p class="rv d2">You already want to read. What you never had was a <strong>fixed time and place</strong>. Thread is a cue delivery system with a reading surface attached — one if-then sentence, one quiet screen.</p>
+      </div>
+    </section>
+
+    <!-- RITUAL — performed zones, thread sews through each -->
+    <section class="chapter c-arrival" data-anchor="0.18">
+      <div>
+        <div class="zone-head"><span class="zone-tag"><b>zone 01</b> · arrival</span></div>
+        <p class="day rv">Tuesday · July 14 · day 9 in John</p>
+        <h2 class="rv d1">Every day starts the same way.</h2>
+        <p class="cue-line rv d2">After <span class="blank" data-type="my morning coffee"></span>, I read in <span class="blank" data-type="the armchair by the window"></span>.<span class="caret"></span></p>
+        <p class="tapnote rv d3">the cue is one editable sentence — the most important screen in the app</p>
+      </div>
+    </section>
+
+    <section class="chapter c-recall" data-anchor="0.82">
+      <div>
+        <div class="zone-head"><span class="zone-tag"><b>zone 02</b> · recall — only appears when a passage is due</span></div>
+        <p class="kicker rv">From memory, if you can:</p>
+        <h2 class="refbig rv d1">John 4:14</h2>
+        <button class="btn rv d2" id="revealBtn">Reveal the text</button>
+        <div class="reveal-box" id="revealBox">
+          <blockquote>“…whoever drinks of the water that I will give him will never thirst again; the water that I will give him will become in him a well of water springing up to eternal life.”</blockquote>
+          <div class="grade-row">
+            <button class="grade">Held</button>
+            <button class="grade">Partial</button>
+            <button class="grade">Lost</button>
+          </div>
+          <p class="tapnote">a failed recall touches nothing — no streak, no penalty</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter c-scripture" data-anchor="0.18">
+      <div>
+        <div class="zone-head"><span class="zone-tag"><b>zone 03</b> · scripture</span></div>
+        <p class="verse sweep rv"><span class="vn">7</span>A woman of Samaria came to draw water. Jesus said to her, “Give me a drink.”</p>
+        <p class="verse sweep rv d1"><span class="vn">10</span>Jesus answered her, “If you knew the gift of God, and who it is who says to you, ‘Give me a drink,’ you would have asked him, and he would have given you living water.”</p>
+        <p class="verse sweep rv d2"><span class="vn">11</span>The woman said to him, “Sir, you have nothing to draw with, and the well is deep. Where then do you get that living water?”</p>
+        <p class="tapnote rv d3">one paragraph per verse, no chrome — tap a verse that stays with you and it becomes a memory candidate</p>
+      </div>
+    </section>
+
+    <section class="chapter center c-seal" data-anchor="0.5">
+      <div class="zone-head"><span class="zone-tag"><b>zone 04</b> · the seal</span></div>
+      <h2 class="rv" style="font: 800 clamp(30px,5vw,46px)/1.1 var(--display); letter-spacing:-.02em">Press and hold to seal the day.</h2>
+      <button class="seal-btn rv d1" id="sealBtn" aria-label="Press and hold to seal">
+        <svg viewBox="0 0 156 156">
+          <circle class="track" cx="78" cy="78" r="74"></circle>
+          <circle class="prog" id="sealProg" cx="78" cy="78" r="74" stroke-dasharray="464.9" stroke-dashoffset="464.9"></circle>
+        </svg>
+        <div class="core"></div>
+      </button>
+      <p class="seal-hint rv d2" id="sealHint">hold ~1.2s · release early and the ring unwinds, nothing is logged<br>sealing unlocks the rest of the page ↓</p>
+    </section>
+
+    <section class="chapter center c-weave locked" id="weaveChapter" data-anchor="0.5">
+      <div class="zone-head"><span class="zone-tag"><b>zone 05</b> · the weave</span></div>
+      <h2 style="font: 800 clamp(30px,5vw,46px)/1.1 var(--display); letter-spacing:-.02em">Your month, woven.</h2>
+      <p class="body">Each sealed day pulls a thread through. <strong>Gaps stay gaps</strong> — a mirror, not a threat.</p>
+      <div class="weave" aria-hidden="true">
+        <i style="transition-delay:.00s"></i><i style="transition-delay:.03s"></i><i style="transition-delay:.06s"></i><i class="gap"></i><i style="transition-delay:.09s"></i><i style="transition-delay:.12s"></i><i style="transition-delay:.15s"></i><i style="transition-delay:.18s"></i><i class="gap"></i><i style="transition-delay:.21s"></i><i style="transition-delay:.24s"></i><i style="transition-delay:.27s"></i><i style="transition-delay:.30s"></i><i style="transition-delay:.33s"></i><i class="gap"></i>
+        <i style="transition-delay:.36s"></i><i style="transition-delay:.39s"></i><i class="gap"></i><i style="transition-delay:.42s"></i><i style="transition-delay:.45s"></i><i style="transition-delay:.48s"></i><i style="transition-delay:.51s"></i><i style="transition-delay:.54s"></i><i style="transition-delay:.57s"></i><i class="gap"></i><i style="transition-delay:.60s"></i><i style="transition-delay:.63s"></i><i style="transition-delay:.66s"></i><i style="transition-delay:.69s"></i><i style="transition-delay:.72s"></i>
+      </div>
+    </section>
+
+    <section class="chapter center c-dismiss locked" id="dismissChapter" data-anchor="0.5">
+      <div class="zone-head"><span class="zone-tag"><b>zone 06</b> · dismissal</span></div>
+      <p class="closer">That's the whole app.<br>Now close the tab — or take it with you.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="https://github.com/sbrn3/thread/releases/latest">Download the APK</a>
+        <a class="btn" href="https://github.com/sbrn3/thread">Source on GitHub</a>
+      </div>
+      <p class="fine">android · free · open source · no account · nothing leaves your phone<br>this page is a preview of the designed flow — the app is in active development</p>
+    </section>
+
+  </div>
+</main>
+
+<script>
+(function () {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- reveal-on-view ----
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), { threshold: 0.25 });
+  document.querySelectorAll('.rv').forEach(el => io.observe(el));
+
+  // ---- the needle: one path sewn through the entire page ----
+  const svg = document.getElementById('needleSvg');
+  const ghost = document.getElementById('needleGhost');
+  const sewn = document.getElementById('needleSewn');
+  let pathLen = 0, target = 0, shown = -1, rafId = null;
+
+  function buildNeedle() {
+    const stage = document.querySelector('.stage');
+    const W = stage.clientWidth, H = stage.scrollHeight;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.height = H + 'px';
+    const anchors = stage.querySelectorAll('[data-anchor]');
+    const pts = [];
+    anchors.forEach(sec => {
+      const x = W * parseFloat(sec.dataset.anchor);
+      const y = sec.offsetTop + sec.offsetHeight * 0.5;
+      pts.push([x, y]);
+    });
+    pts.unshift([W * 0.5, -40]);
+    pts.push([W * 0.5, H - 40]);
+    let d = `M ${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+      const cy = (y0 + y1) / 2;
+      d += ` C ${x0} ${cy}, ${x1} ${cy}, ${x1} ${y1}`;
+    }
+    ghost.setAttribute('d', d);
+    sewn.setAttribute('d', d);
+    pathLen = sewn.getTotalLength();
+    sewn.style.strokeDasharray = pathLen;
+    sewn.style.strokeDashoffset = reduced ? 0 : pathLen;
+    shown = -1;
+    onScroll();
+  }
+
+  function onScroll() {
+    if (reduced) return;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    target = max > 0 ? Math.min(scrollY / max, 1) : 0;
+    if (rafId === null) rafId = requestAnimationFrame(tick);
+  }
+  function tick() {
+    shown = shown < 0 ? target : shown + (target - shown) * 0.08;
+    sewn.style.strokeDashoffset = pathLen * (1 - shown);
+    if (Math.abs(target - shown) > 0.0005) rafId = requestAnimationFrame(tick);
+    else rafId = null;
+  }
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', buildNeedle);
+  buildNeedle();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(buildNeedle);
+  // seal/weave unlock changes layout height — rebuild after
+  const resizeObs = new ResizeObserver(() => buildNeedle());
+  resizeObs.observe(document.querySelector('.stage'));
+
+  // ---- arrival: typing cue blanks ----
+  const blanks = document.querySelectorAll('.blank');
+  let typed = false;
+  function typeBlanks() {
+    if (typed) return; typed = true;
+    if (reduced) { blanks.forEach(b => b.textContent = b.dataset.type); return; }
+    let chain = Promise.resolve();
+    blanks.forEach(b => {
+      chain = chain.then(() => new Promise(res => {
+        const text = b.dataset.type; let i = 0;
+        const t = setInterval(() => {
+          b.textContent = text.slice(0, ++i);
+          if (i >= text.length) { clearInterval(t); setTimeout(res, 300); }
+        }, 45);
+      }));
+    });
+  }
+  new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) typeBlanks(); }), { threshold: 0.4 })
+    .observe(document.querySelector('.c-arrival'));
+
+  // ---- recall reveal ----
+  document.getElementById('revealBtn').addEventListener('click', function () {
+    document.getElementById('revealBox').classList.add('open');
+    this.style.display = 'none';
+  });
+
+  // ---- verse sweep ----
+  const sweepIO = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in-sweep'); sweepIO.unobserve(e.target); }
+  }), { threshold: 0.6 });
+  document.querySelectorAll('.verse.sweep').forEach(v => sweepIO.observe(v));
+
+  // ---- seal: press-and-hold, unlocks weave + dismissal ----
+  (function () {
+    const HOLD = 1200, CIRC = 464.9;
+    const btn = document.getElementById('sealBtn');
+    const prog = document.getElementById('sealProg');
+    const hint = document.getElementById('sealHint');
+    let raf = null, start = 0, sealed = false;
+    function frame(now) {
+      const t = Math.min((now - start) / HOLD, 1);
+      prog.style.strokeDashoffset = CIRC * (1 - t);
+      if (t >= 1) return seal();
+      raf = requestAnimationFrame(frame);
+    }
+    function seal() {
+      sealed = true; raf = null;
+      btn.classList.add('sealed');
+      hint.innerHTML = 'sealed · the weave below is now yours ↓';
+      ['weaveChapter', 'dismissChapter'].forEach(id => document.getElementById(id).classList.add('unlocked'));
+      if (navigator.vibrate && !reduced) navigator.vibrate(30);
+    }
+    btn.addEventListener('pointerdown', e => {
+      if (sealed) return; e.preventDefault();
+      if (reduced) { prog.style.strokeDashoffset = 0; return seal(); }
+      start = performance.now(); raf = requestAnimationFrame(frame);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, () => {
+      if (sealed || raf === null) return;
+      cancelAnimationFrame(raf); raf = null;
+      prog.style.transition = 'stroke-dashoffset .4s ease';
+      prog.style.strokeDashoffset = CIRC;
+      setTimeout(() => prog.style.transition = '', 420);
+    }));
+  })();
+
+  // ---- weave animates once unlocked + in view ----
+  new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting && e.target.classList.contains('unlocked')) e.target.classList.add('woven');
+  }), { threshold: 0.4 }).observe(document.getElementById('weaveChapter'));
+})();
+</script>
+</body>
+</html>
