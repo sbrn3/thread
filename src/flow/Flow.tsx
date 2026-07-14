@@ -29,7 +29,7 @@ interface FlowProps {
 // is also reachable any time via the knot (W5), independent of
 // today's seal.
 export function Flow({ services }: FlowProps) {
-  const { db, log, text, memory } = services;
+  const { db, log, text, memory, notifier } = services;
   const session = useSession();
   const reducedMotion = useReducedMotion();
 
@@ -68,6 +68,16 @@ export function Flow({ services }: FlowProps) {
   useEffect(() => {
     if (session.sealedToday) refreshMonthGrid();
   }, [session.sealedToday, refreshMonthGrid]);
+
+  useEffect(() => {
+    if (session.loading) return;
+    // Known simplification: runs once per app open against whatever
+    // cue is active then. Editing the cue mid-session (via the knot)
+    // doesn't retroactively reschedule notifications already planned
+    // for future dates — they catch up on the next open.
+    const currentCue = services.cue.current();
+    if (currentCue) void notifier.syncWindow(currentCue, today);
+  }, [session.loading, notifier, services.cue, today]);
 
   const logReadingStart = useCallback(() => {
     if (readingStartLogged.current) return;
@@ -116,9 +126,10 @@ export function Flow({ services }: FlowProps) {
       scrollEndLogged.current = false;
       readingStartFired.value = false;
       scrollEndFired.value = false;
+      void notifier.cancelToday(today); // §08 — sealing silences the phone for the rest of the day
       refreshMonthGrid();
     });
-  }, [session, db, log, text, today, refreshMonthGrid, readingStartFired, scrollEndFired]);
+  }, [session, db, log, text, today, refreshMonthGrid, readingStartFired, scrollEndFired, notifier]);
 
   const handleHoldCancel = useCallback(() => {
     log.write({ type: 'hold_cancel', book: session.book, chapter: session.chapter, sitting: session.sittingIndex });

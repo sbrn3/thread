@@ -1,3 +1,4 @@
+import * as ExpoNotifications from 'expo-notifications';
 import { CueService } from '../cue';
 import { BUILD_SHA } from '../log/buildSha';
 import type { SqlDb } from '../log/db';
@@ -5,6 +6,7 @@ import { openAppDb } from '../log/expoDb';
 import { Log } from '../log/log';
 import { migrate } from '../log/schema';
 import { Memory } from '../memory/memory';
+import { Notifier } from '../notify';
 import { createTextProvider, type TextProvider } from '../text';
 
 export interface Services {
@@ -13,6 +15,7 @@ export interface Services {
   text: TextProvider;
   cue: CueService;
   memory: Memory;
+  notifier: Notifier;
 }
 
 /**
@@ -31,5 +34,6 @@ export function createServices(): Services {
   });
   const cue = new CueService(db, log);
   const memory = new Memory(db, log);
-  return { db, log, text, cue, memory };
+  const notifier = new Notifier(db, ExpoNotifications);
+  return { db, log, text, cue, memory, notifier };
 }
