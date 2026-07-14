@@ -159,8 +159,21 @@ const V2: string[] = [
 // cue_strength is low.
 const V3: string[] = [`ALTER TABLE cue ADD COLUMN validated INTEGER DEFAULT 0`];
 
+// v4 — reconcile()'s diagnose() output (§11/§13.4 disengagement
+// state). One row per logical day: lapse signature, current dose,
+// how many days into a lapse, whether dormancy has kicked in.
+const V4: string[] = [
+  `CREATE TABLE IF NOT EXISTS state (
+    local_date TEXT PRIMARY KEY,
+    signature TEXT,
+    dose TEXT,
+    ladder_day INTEGER,
+    dormant INTEGER DEFAULT 0
+  )`,
+];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

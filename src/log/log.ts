@@ -64,49 +64,56 @@ export class Log {
 
   /**
    * days is derived; it can always be recomputed from events (§13.2).
-   * Minimal W1 rebuild: sealed / sealed_before_nudge / book position.
-   * closeDay() in /src/lab (W7) will own the richer dose + experiment
-   * columns; it reuses this same derivation.
+   * Wraps repeated deriveDayRow() calls in one transaction. reconcile()'s
+   * closeDay (W7) calls deriveDayRow() directly instead, since it
+   * already owns an outer transaction per day.
    */
-  rebuildDays(from: string): void {
+  rebuildDays(from: string, to = '9999-12-31'): void {
     this.db.tx(() => {
       const dates = this.db.all<{ local_date: string }>(
-        'SELECT DISTINCT local_date FROM events WHERE local_date >= ? ORDER BY local_date',
-        [from],
+        'SELECT DISTINCT local_date FROM events WHERE local_date >= ? AND local_date <= ? ORDER BY local_date',
+        [from, to],
       );
-      for (const { local_date } of dates) {
-        const events = this.eventsOn(local_date);
-        const seal = events.find((e) => e.type === 'seal');
-        const reading = events.find((e) => e.type === 'reading_start') ?? seal;
-        this.db.run(
-          `INSERT INTO days
-             (local_date, sealed, sealed_before_nudge, book, chapter, sitting,
-              dose, exp_id, exp_arm, disturbed, build_sha)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
-           ON CONFLICT(local_date) DO UPDATE SET
-             sealed = excluded.sealed,
-             sealed_before_nudge = excluded.sealed_before_nudge,
-             book = excluded.book,
-             chapter = excluded.chapter,
-             sitting = excluded.sitting,
-             exp_id = excluded.exp_id,
-             exp_arm = excluded.exp_arm`,
-          [
-            local_date,
-            seal ? 1 : 0,
-            seal ? (seal.before_nudge ?? 1) : null,
-            reading?.book ?? null,
-            reading?.chapter ?? null,
-            reading?.sitting ?? null,
-            'full_chapter',
-            seal?.exp_id ?? null,
-            seal?.exp_arm ?? null,
-            seal?.build_sha ?? null,
-          ],
-        );
-      }
+      for (const { local_date } of dates) deriveDayRow(this.db, this, local_date);
     });
   }
+}
+
+/**
+ * Derives one days row from that date's events — no transaction of
+ * its own, so callers control atomicity (rebuildDays wraps a batch;
+ * reconcile's closeDay relies on its own per-day transaction).
+ */
+export function deriveDayRow(db: SqlDb, log: Log, date: string): void {
+  const events = log.eventsOn(date);
+  const seal = events.find((e) => e.type === 'seal');
+  const reading = events.find((e) => e.type === 'reading_start') ?? seal;
+  db.run(
+    `INSERT INTO days
+       (local_date, sealed, sealed_before_nudge, book, chapter, sitting,
+        dose, exp_id, exp_arm, disturbed, build_sha)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+     ON CONFLICT(local_date) DO UPDATE SET
+       sealed = excluded.sealed,
+       sealed_before_nudge = excluded.sealed_before_nudge,
+       book = excluded.book,
+       chapter = excluded.chapter,
+       sitting = excluded.sitting,
+       exp_id = excluded.exp_id,
+       exp_arm = excluded.exp_arm`,
+    [
+      date,
+      seal ? 1 : 0,
+      seal ? (seal.before_nudge ?? 1) : null,
+      reading?.book ?? null,
+      reading?.chapter ?? null,
+      reading?.sitting ?? null,
+      'full_chapter',
+      seal?.exp_id ?? null,
+      seal?.exp_arm ?? null,
+      seal?.build_sha ?? null,
+    ],
+  );
 }
 
 // meta helpers — watermark, trial seed, dose, dormancy (§13.2)

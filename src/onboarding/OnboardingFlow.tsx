@@ -60,6 +60,10 @@ export function OnboardingFlow({ services, onDone }: OnboardingFlowProps) {
       );
     }
 
+    // reconcile() no-ops forever without this — nothing has happened
+    // yet, so today is the correct starting point; the first day it
+    // will ever walk is tomorrow's app open (§13.4).
+    meta.set(db, 'watermark', today);
     meta.set(db, 'onboarded', '1');
     setDraft(final);
     setStep('done');

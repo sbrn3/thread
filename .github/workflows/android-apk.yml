@@ -46,14 +46,21 @@ jobs:
         run: npx expo prebuild --platform android --no-install
 
       - name: Raise Gradle JVM memory (default 2GB heap/512MB metaspace OOMs lint on this project)
-        run: echo "org.gradle.jvmargs=-Xmx5120m -XX:MaxMetaspaceSize=1536m" >> android/gradle.properties
+        # expo prebuild's generated gradle.properties has no trailing
+        # newline — a bare `echo ... >>` concatenates onto its last
+        # line (expo.inlineModules.watchedDirectories=[]) instead of
+        # starting a new one, corrupting that property's value and
+        # breaking the autolinking mirror-kotlin-inline-modules step
+        # with an opaque "node process exit 1" (JSON.parse on garbage).
+        # The leading newline guarantees this always lands on its own line.
+        run: printf '\norg.gradle.jvmargs=-Xmx5120m -XX:MaxMetaspaceSize=1536m\n' >> android/gradle.properties
 
       - name: Build release APK
         working-directory: android
         env:
           # Stamped into every event row (§13.2)
           EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew assembleRelease
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk thread.apk

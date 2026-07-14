@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ALL_SIGNATURES, ladder, mechanicFrictionThreshold } from '../src/lab/ladder';
 import { PHASES_PER_EXPERIMENT, phaseArm } from '../src/lab/phases';
 import { hashSeed, mulberry32, seededBool, seededUniform } from '../src/lab/prng';
-import { meta } from '../src/log/log';
+import { Log, meta } from '../src/log/log';
 import { migrate } from '../src/log/schema';
 import { reconcile, type ReconcileSteps } from '../src/lab/reconcile';
 import { openTestDb } from './util/testDb';
@@ -94,7 +94,7 @@ describe('the lapse ladder (§11)', () => {
 
 describe('reconcile() skeleton (W7 contract, fixed now)', () => {
   const countingSteps = (calls: string[]): ReconcileSteps => ({
-    closeDay: (_db, d) => calls.push(`close:${d}`),
+    closeDay: (_ctx, d) => calls.push(`close:${d}`),
     attributeRewards: () => {},
     advancePhase: () => {},
     diagnose: () => {},
@@ -105,22 +105,24 @@ describe('reconcile() skeleton (W7 contract, fixed now)', () => {
   it('walks each day once, advances the watermark, and re-running is a no-op', () => {
     const db = openTestDb();
     migrate(db);
+    const log = new Log({ db, buildSha: 'test-sha' });
     meta.set(db, 'watermark', '2026-07-10');
 
     const calls: string[] = [];
-    reconcile(db, countingSteps(calls), '2026-07-13');
+    reconcile({ db, log }, countingSteps(calls), '2026-07-13');
     expect(calls).toEqual(['close:2026-07-11', 'close:2026-07-12', 'close:2026-07-13']);
     expect(meta.get(db, 'watermark')).toBe('2026-07-13');
 
-    reconcile(db, countingSteps(calls), '2026-07-13');
+    reconcile({ db, log }, countingSteps(calls), '2026-07-13');
     expect(calls).toHaveLength(3); // byte-identical no-op
   });
 
   it('does nothing before onboarding sets the watermark', () => {
     const db = openTestDb();
     migrate(db);
+    const log = new Log({ db, buildSha: 'test-sha' });
     const calls: string[] = [];
-    reconcile(db, countingSteps(calls), '2026-07-13');
+    reconcile({ db, log }, countingSteps(calls), '2026-07-13');
     expect(calls).toHaveLength(0);
   });
 });
