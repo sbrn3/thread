@@ -30,6 +30,20 @@ export class Memory {
     this.log.write({ type: 'candidate_marked', book: r.book, chapter: r.chapter });
   }
 
+  /**
+   * Retracts a tap — the reader marked a verse, then changed their
+   * mind before it ever became a real commitment. Only ever removes
+   * an unpromoted candidate; a promoted passage represents a real
+   * decision made at book-end and is never touched here.
+   */
+  unmarkCandidate(r: PassageRef): void {
+    this.db.run(
+      `DELETE FROM passages
+         WHERE book = ? AND chapter = ? AND verse_start = ? AND verse_end = ? AND promoted_at IS NULL`,
+      [r.book, r.chapter, r.verseStart, r.verseEnd],
+    );
+  }
+
   candidates(book: string): Passage[] {
     return this.db.all<Passage>(
       'SELECT * FROM passages WHERE book = ? AND promoted_at IS NULL ORDER BY marked_at DESC',

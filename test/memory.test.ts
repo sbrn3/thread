@@ -26,6 +26,41 @@ describe('Memory (§13.3 /src/memory, §21)', () => {
     expect(event?.type).toBe('candidate_marked');
   });
 
+  it('unmarkCandidate retracts a tap — the candidate is gone, not just hidden', () => {
+    const { db, memory } = setup();
+    const ref = { book: 'john', chapter: 3, verseStart: 16, verseEnd: 16 };
+    memory.markCandidate(ref, () => 1);
+    expect(memory.candidates('john')).toHaveLength(1);
+
+    memory.unmarkCandidate(ref);
+
+    expect(memory.candidates('john')).toHaveLength(0);
+    expect(db.all('SELECT * FROM passages')).toHaveLength(0);
+  });
+
+  it('re-marking the same verse after unmarking does not leave duplicates', () => {
+    const { memory } = setup();
+    const ref = { book: 'john', chapter: 3, verseStart: 16, verseEnd: 16 };
+    memory.markCandidate(ref, () => 1);
+    memory.unmarkCandidate(ref);
+    memory.markCandidate(ref, () => 2);
+
+    expect(memory.candidates('john')).toHaveLength(1);
+  });
+
+  it('unmarkCandidate never touches a promoted passage, even for the same reference', () => {
+    const { memory } = setup();
+    const ref = { book: 'john', chapter: 3, verseStart: 16, verseEnd: 16 };
+    memory.markCandidate(ref, () => 1);
+    const [{ id }] = memory.candidates('john');
+    memory.promote(id, '2026-07-14');
+
+    memory.unmarkCandidate(ref);
+
+    // Promoted passages aren't returned by candidates(); confirm via due().
+    expect(memory.due('2026-07-14')).toHaveLength(1);
+  });
+
   it('candidates() only returns unpromoted marks for that book', () => {
     const { db, memory } = setup();
     memory.markCandidate({ book: 'john', chapter: 3, verseStart: 16, verseEnd: 16 }, () => 1);

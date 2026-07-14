@@ -7,8 +7,12 @@ interface ScriptureZoneProps {
   verses: Verse[];
   attribution: string | null;
   onLayout?: (y: number, height: number) => void;
-  /** Tap a verse to mark it as a memory candidate (§21). Omitted in read-only views (the knot's chapter strip). */
-  onMarkVerse?: (verse: number) => void;
+  /**
+   * Tap a verse to mark it as a memory candidate, tap again to retract
+   * it (§21). `marked` reports the state AFTER this tap. Omitted in
+   * read-only views (the knot's chapter strip).
+   */
+  onMarkVerse?: (verse: number, marked: boolean) => void;
 }
 
 // §04 zone 2 — one paragraph per verse, no chrome. Tapping a verse
@@ -25,8 +29,14 @@ export function ScriptureZone({ verses, attribution, onLayout, onMarkVerse }: Sc
 
   const toggleMark = (v: number) => {
     if (!onMarkVerse) return;
-    setMarked((prev) => new Set(prev).add(v));
-    onMarkVerse(v);
+    const nowMarked = !marked.has(v);
+    setMarked((prev) => {
+      const next = new Set(prev);
+      if (nowMarked) next.add(v);
+      else next.delete(v);
+      return next;
+    });
+    onMarkVerse(v, nowMarked);
   };
 
   return (

@@ -144,8 +144,10 @@ export function Flow({ services }: FlowProps) {
   }, [session.justFinishedBook, memory]);
 
   const handleMarkVerse = useCallback(
-    (verse: number) => {
-      memory.markCandidate({ book: session.book, chapter: session.chapter, verseStart: verse, verseEnd: verse });
+    (verse: number, marked: boolean) => {
+      const ref = { book: session.book, chapter: session.chapter, verseStart: verse, verseEnd: verse };
+      if (marked) memory.markCandidate(ref);
+      else memory.unmarkCandidate(ref);
     },
     [memory, session.book, session.chapter],
   );
