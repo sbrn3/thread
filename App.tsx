@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Flow } from './src/flow/Flow';
 import { Knot } from './src/knot';
+import { maybeGenerateReports } from './src/lab/analysis/report';
 import { reconcile } from './src/lab/reconcile';
 import { RECONCILE_STEPS } from './src/lab/steps';
 import { meta } from './src/log/log';
@@ -23,6 +24,7 @@ export default function App() {
     // lazily, on foreground. Runs before app_open is logged so the
     // reconciled state reflects days up to (not including) today.
     reconcile({ db, log: services.log }, RECONCILE_STEPS);
+    maybeGenerateReports(db);
     services.log.write({ type: 'app_open' });
   }, [onboarded, services, db]);
 

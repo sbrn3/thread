@@ -172,8 +172,12 @@ const V4: string[] = [
   )`,
 ];
 
+// v5 — §15 report display: the exact rendered text, so the UI can
+// show a report without recomputing analysis just to redisplay it.
+const V5: string[] = [`ALTER TABLE reports ADD COLUMN report_text TEXT`];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3, V4];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

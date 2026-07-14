@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { PendingReport } from '../lab/analysis/report';
 import type { Passage } from '../log/types';
 import { bookName } from '../text/canon';
 import { BookPicker } from '../ui/BookPicker';
 import { tokens } from '../ui/tokens';
+import { ReportPrompt } from './ReportPrompt';
 
 interface DismissalZoneProps {
   book: string;
@@ -16,6 +18,10 @@ interface DismissalZoneProps {
   /** True whenever the next-book queue is empty (§04) — persists across days until picked, not gated by justFinishedBook. */
   needsNextBookPick: boolean;
   onPickNextBook: (bookId: string) => void;
+  /** §15 — a completed experiment's report, not yet responded to. */
+  pendingReport: PendingReport | null;
+  onApplyReport: (expId: string) => void;
+  onKeepReport: (expId: string) => void;
 }
 
 function reference(book: string, p: Passage): string {
@@ -39,6 +45,9 @@ export function DismissalZone({
   onPromote,
   needsNextBookPick,
   onPickNextBook,
+  pendingReport,
+  onApplyReport,
+  onKeepReport,
 }: DismissalZoneProps) {
   const [pending, setPending] = useState<string | null>(null);
   const pct = chapterCount > 0 ? Math.round((chapter / chapterCount) * 100) : 0;
@@ -74,6 +83,15 @@ export function DismissalZone({
             </Pressable>
           )}
         </View>
+      )}
+
+      {pendingReport && (
+        <ReportPrompt
+          recommendation={pendingReport.recommendation}
+          reportText={pendingReport.reportText}
+          onApply={() => onApplyReport(pendingReport.expId)}
+          onKeep={() => onKeepReport(pendingReport.expId)}
+        />
       )}
 
       <Text style={styles.close}>Now close the app.</Text>

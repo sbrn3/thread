@@ -6,6 +6,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
 } from 'react-native-reanimated';
+import { getPendingReport, markApplied, type PendingReport } from '../lab/analysis/report';
 import type { Services } from '../services';
 import { useSession } from '../state/session';
 import { logicalToday } from '../log/time';
@@ -68,6 +69,28 @@ export function Flow({ services }: FlowProps) {
   useEffect(() => {
     if (session.sealedToday) refreshMonthGrid();
   }, [session.sealedToday, refreshMonthGrid]);
+
+  // §15 — reports surface once, after a seal, never before or during
+  // reading.
+  const [pendingReport, setPendingReport] = useState<PendingReport | null>(null);
+  useEffect(() => {
+    if (session.sealedToday) setPendingReport(getPendingReport(db));
+  }, [session.sealedToday, db]);
+
+  const handleApplyReport = useCallback(
+    (expId: string) => {
+      markApplied(db, expId, true);
+      setPendingReport(null);
+    },
+    [db],
+  );
+  const handleKeepReport = useCallback(
+    (expId: string) => {
+      markApplied(db, expId, false);
+      setPendingReport(null);
+    },
+    [db],
+  );
 
   useEffect(() => {
     if (session.loading) return;
@@ -273,6 +296,9 @@ export function Flow({ services }: FlowProps) {
               onPromote={handlePromote}
               needsNextBookPick={session.nextBookNeeded}
               onPickNextBook={handlePickNextBook}
+              pendingReport={pendingReport}
+              onApplyReport={handleApplyReport}
+              onKeepReport={handleKeepReport}
             />
           </>
         )}
