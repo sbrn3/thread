@@ -117,6 +117,12 @@ export function Flow({ services }: FlowProps) {
     });
   }, [session, db, log, text, today, refreshMonthGrid, readingStartFired, scrollEndFired]);
 
+  const handleHoldCancel = useCallback(() => {
+    log.write({ type: 'hold_cancel', book: session.book, chapter: session.chapter, sitting: session.sittingIndex });
+  }, [log, session.book, session.chapter, session.sittingIndex]);
+
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+
   if (session.loading) return null;
 
   return (
@@ -131,6 +137,7 @@ export function Flow({ services }: FlowProps) {
         style={styles.scroll}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        scrollEnabled={scrollEnabled}
         onContentSizeChange={(_, h) => (contentHeight.value = h)}
       >
         <ArrivalZone
@@ -150,7 +157,13 @@ export function Flow({ services }: FlowProps) {
             scriptureBottom.value = y + height;
           }}
         />
-        <SealZone sealed={session.sealedToday} onSeal={handleSeal} />
+        <SealZone
+          sealed={session.sealedToday}
+          reducedMotion={reducedMotion}
+          onSeal={handleSeal}
+          onHoldCancel={handleHoldCancel}
+          onScrollLock={(locked) => setScrollEnabled(!locked)}
+        />
         {session.sealedToday && (
           <>
             <WeaveZone
