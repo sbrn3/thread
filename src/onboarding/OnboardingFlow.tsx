@@ -64,6 +64,12 @@ export function OnboardingFlow({ services, onDone }: OnboardingFlowProps) {
     // yet, so today is the correct starting point; the first day it
     // will ever walk is tomorrow's app open (§13.4).
     meta.set(db, 'watermark', today);
+    meta.set(db, 'trial_start', today);
+    // The whole trial year's random assignments must be reconstructible
+    // from this one value (§13 "seeded PRNG only") — it's set once,
+    // here, and never touched again. Date.now() (not Math.random()) is
+    // fine as a one-time seed source; nothing downstream calls it again.
+    meta.set(db, 'trial_seed', String(Date.now()));
     meta.set(db, 'onboarded', '1');
     setDraft(final);
     setStep('done');

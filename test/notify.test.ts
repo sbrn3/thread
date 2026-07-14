@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { meta } from '../src/log/log';
 import { migrate } from '../src/log/schema';
 import type { NotificationsLike } from '../src/notify/notifier';
 import { Notifier } from '../src/notify/notifier';
@@ -56,21 +57,51 @@ function fakeNotifications(): NotificationsLike & { scheduled: Map<string, unkno
   };
 }
 
-describe('Notifier (§13.3 /src/notify, §08)', () => {
+describe('Notifier (§13.3 /src/notify, §08, §10 E5 arm selection)', () => {
   it('syncWindow schedules a decision row per planned day, with a deterministic identifier', async () => {
     const db = openTestDb();
     migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
     const fake = fakeNotifications();
     const notifier = new Notifier(db, fake);
 
     await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, '2026-07-14');
 
-    const rows = db.all<{ local_date: string; delivered: number }>(
+    const rows = db.all<{ local_date: string; delivered: number; arm: string }>(
       "SELECT * FROM decisions WHERE point = 'nudge_hour'",
     );
     expect(rows).toHaveLength(30);
-    expect(rows.every((r) => r.delivered === 0)).toBe(true);
-    expect(fake.scheduled.has('nudge-2026-07-15')).toBe(true);
+    // silence rows are delivered=1 immediately (nothing pending to cancel);
+    // anchor_echo/neutral rows start at delivered=0 (pending an OS fire).
+    for (const r of rows) {
+      expect(r.delivered).toBe(r.arm === 'silence' ? 1 : 0);
+    }
+    expect(rows.some((r) => r.arm === 'anchor_echo' || r.arm === 'neutral')).toBe(true);
+    // Only non-silence arms get an actual OS notification scheduled.
+    const scheduledDates = rows.filter((r) => r.arm !== 'silence').length;
+    expect(fake.scheduled.size).toBe(scheduledDates);
+  });
+
+  it('anchor_echo copy references the actual cue anchor', async () => {
+    const db = openTestDb();
+    migrate(db);
+    // Pick a seed/date combination known to land on anchor_echo for day 1
+    // (verified empirically) — the point under test is the copy content,
+    // not the arm-selection distribution itself (covered in mrt.test.ts).
+    let anchorEchoSeen = false;
+    for (const seed of ['s1', 's2', 's3', 's4', 's5']) {
+      const trialDb = openTestDb();
+      migrate(trialDb);
+      meta.set(trialDb, 'trial_seed', seed);
+      const fake = fakeNotifications();
+      const notifier = new Notifier(trialDb, fake);
+      await notifier.syncWindow({ anchor: 'my coffee', place: 'chair', nudgeHour: 21, validated: true }, '2026-07-14');
+      for (const [, req] of fake.scheduled) {
+        const body = (req as { content: { body: string } }).content.body;
+        if (body.includes('my coffee')) anchorEchoSeen = true;
+      }
+    }
+    expect(anchorEchoSeen).toBe(true);
   });
 
   it('syncWindow no-ops when permission is not granted', async () => {
@@ -133,5 +164,27 @@ describe('Notifier (§13.3 /src/notify, §08)', () => {
     );
     expect(row?.delivered).toBe(0);
     expect(row?.reward).toBeNull();
+  });
+
+  it('never voids a silence-arm decision — it has nothing to cancel and is already a complete comparison point', async () => {
+    const db = openTestDb();
+    migrate(db);
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+    const today = '2026-07-14';
+
+    db.run(
+      `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
+       VALUES (0, ?, 'nudge_hour', 'silence', 0, 1)`,
+      [today],
+    );
+
+    await notifier.cancelToday(today);
+
+    const row = db.get<{ delivered: number }>(
+      "SELECT delivered FROM decisions WHERE local_date = ? AND point = 'nudge_hour'",
+      [today],
+    );
+    expect(row?.delivered).toBe(1); // untouched — voiding this would bias the MRT estimate toward silence
   });
 });

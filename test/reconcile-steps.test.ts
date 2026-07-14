@@ -40,6 +40,40 @@ describe('closeDay (§13.4 reconcile step 1)', () => {
     // (a naive nested db.tx() call would, depending on the driver).
     expect(() => ctx.db.tx(() => closeDay(ctx, date))).not.toThrow();
   });
+
+  it('flags a day disturbed on a cue_changed event (§13 confound detection)', () => {
+    const ctx = setup();
+    ctx.log.write({ type: 'cue_changed' });
+    const date = ctx.db.get<{ local_date: string }>('SELECT local_date FROM events')!.local_date;
+
+    closeDay(ctx, date);
+
+    expect(ctx.db.get<{ disturbed: number }>('SELECT disturbed FROM days WHERE local_date = ?', [date])?.disturbed).toBe(1);
+  });
+
+  it('flags a day disturbed on a 7+ day gap since the last seal', () => {
+    const ctx = setup();
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-01', 1, 'full_chapter')`);
+    ctx.log.write({ type: 'reading_start', book: 'john', chapter: 1 });
+    // Force the event's local_date to be 7 days after the last seal.
+    ctx.db.run(`UPDATE events SET local_date = '2026-07-08'`);
+
+    closeDay(ctx, '2026-07-08');
+
+    expect(
+      ctx.db.get<{ disturbed: number }>("SELECT disturbed FROM days WHERE local_date = '2026-07-08'")?.disturbed,
+    ).toBe(1);
+  });
+
+  it('leaves a normal day undisturbed', () => {
+    const ctx = setup();
+    ctx.log.write({ type: 'seal', book: 'john', chapter: 3 });
+    const date = ctx.db.get<{ local_date: string }>('SELECT local_date FROM events')!.local_date;
+
+    closeDay(ctx, date);
+
+    expect(ctx.db.get<{ disturbed: number }>('SELECT disturbed FROM days WHERE local_date = ?', [date])?.disturbed).toBe(0);
+  });
 });
 
 describe('attributeRewards (§13.4 reconcile step 2)', () => {
@@ -83,11 +117,28 @@ describe('attributeRewards (§13.4 reconcile step 2)', () => {
   });
 });
 
-describe('advancePhase (§13.4 reconcile step 3)', () => {
-  it('is a correct no-op when no experiment has been seeded yet (W8)', () => {
+describe('advancePhase (§13.4 reconcile step 3, §13 "one reversal at a time")', () => {
+  it('is a no-op with no trial_start set, or before the 21-day baseline ends', () => {
     const ctx = setup();
     expect(() => advancePhase(ctx, '2026-07-14')).not.toThrow();
     expect(ctx.db.all('SELECT * FROM exp_phases')).toHaveLength(0);
+
+    meta.set(ctx.db, 'trial_start', '2026-07-01');
+    advancePhase(ctx, '2026-07-10'); // day 9 — baseline (21d) not over yet
+    expect(ctx.db.all('SELECT * FROM exp_phases')).toHaveLength(0);
+  });
+
+  it('seeds the first queued experiment (E4) the day the 21-day baseline ends', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'trial_seed', 'fixed-seed');
+    meta.set(ctx.db, 'trial_start', '2026-07-01');
+
+    advancePhase(ctx, '2026-07-22'); // trial_start + 21
+
+    const row = ctx.db.get<{ exp_id: string; phase: number; status: string; start_date: string }>(
+      'SELECT * FROM exp_phases',
+    );
+    expect(row).toMatchObject({ exp_id: 'E4', phase: 0, status: 'active', start_date: '2026-07-22' });
   });
 
   it('flips to the next phase when the active one ends, using the seeded arm sequence', () => {
@@ -109,18 +160,38 @@ describe('advancePhase (§13.4 reconcile step 3)', () => {
     ]);
   });
 
-  it('marks the experiment done after its last phase, without inserting a 5th', () => {
+  it('chains to the next queued experiment once one finishes all 4 phases', () => {
     const ctx = setup();
     meta.set(ctx.db, 'trial_seed', 'fixed-seed');
+    // E4 is first in the queue; E1 is next. Finishing E4's phase 3 should seed E1.
     ctx.db.run(
       `INSERT INTO exp_phases (exp_id, phase, arm, start_date, end_date, status)
-       VALUES ('E1', 3, 'B', '2026-06-24', '2026-07-14', 'active')`,
+       VALUES ('E4', 3, 'B', '2026-06-24', '2026-07-14', 'active')`,
     );
 
     advancePhase(ctx, '2026-07-14');
 
-    const rows = ctx.db.all("SELECT * FROM exp_phases WHERE exp_id = 'E1'");
-    expect(rows).toHaveLength(1);
+    expect(ctx.db.get("SELECT status FROM exp_phases WHERE exp_id = 'E4' AND phase = 3")).toEqual({
+      status: 'done',
+    });
+    const e1 = ctx.db.get<{ phase: number; status: string; start_date: string }>(
+      "SELECT phase, status, start_date FROM exp_phases WHERE exp_id = 'E1'",
+    );
+    expect(e1).toEqual({ phase: 0, status: 'active', start_date: '2026-07-15' });
+  });
+
+  it('marks the last queued experiment (E3) fully done with nothing queued after it', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'trial_seed', 'fixed-seed');
+    ctx.db.run(
+      `INSERT INTO exp_phases (exp_id, phase, arm, start_date, end_date, status)
+       VALUES ('E3', 3, 'B', '2026-06-24', '2026-07-14', 'active')`,
+    );
+
+    advancePhase(ctx, '2026-07-14');
+
+    const rows = ctx.db.all("SELECT * FROM exp_phases");
+    expect(rows).toHaveLength(1); // nothing new seeded — E3 is last in REVERSAL_QUEUE
     expect((rows[0] as { status: string }).status).toBe('done');
   });
 });
@@ -155,6 +226,31 @@ describe('diagnose (§13.4 reconcile step 4)', () => {
     expect(ctx.db.get<{ dose: string }>("SELECT dose FROM state WHERE local_date = '2026-07-14'")?.dose).toBe(
       'full_chapter',
     );
+  });
+
+  it('records the E6 post-miss MRT decision exactly on the morning a lapse starts (ladder_day = 1)', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'trial_seed', 'fixed-seed');
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-13', 1, 'full_chapter')`);
+
+    diagnose(ctx, '2026-07-14'); // ladder_day = 1 — the morning after
+
+    const decision = ctx.db.get<{ point: string; arm: string; delivered: number }>(
+      "SELECT point, arm, delivered FROM decisions WHERE point = 'post_miss_morning'",
+    );
+    expect(decision?.point).toBe('post_miss_morning');
+    expect(['re_entry', 'none']).toContain(decision?.arm);
+    expect(decision?.delivered).toBe(1);
+  });
+
+  it('does not record an E6 decision on subsequent days of an ongoing lapse, or on a healthy day', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'trial_seed', 'fixed-seed');
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-01', 1, 'full_chapter')`);
+
+    diagnose(ctx, '2026-07-05'); // ladder_day = 4, not the start of the lapse
+
+    expect(ctx.db.all("SELECT * FROM decisions WHERE point = 'post_miss_morning'")).toHaveLength(0);
   });
 });
 

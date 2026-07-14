@@ -4,7 +4,9 @@
 // The real module is supplied at construction time (see services/index.ts).
 import type * as ExpoNotifications from 'expo-notifications';
 import type { Cue } from '../cue';
+import { weightedPick } from '../lab/mrt';
 import type { SqlDb } from '../log/db';
+import { meta } from '../log/log';
 import { addDays, logicalToday } from '../log/time';
 import { planSyncWindow } from './schedule';
 
@@ -17,7 +19,15 @@ export interface NotificationsLike {
   cancelScheduledNotificationAsync(identifier: string): Promise<void>;
 }
 
-const DEFAULT_COPY = { title: 'Thread', body: "Haven't read yet today." };
+// §10 E5 — anchor-echo (p=.4), neutral (p=.4), silence (p=.2).
+type NudgeArm = 'anchor_echo' | 'neutral' | 'silence';
+const NUDGE_WEIGHTS: Record<NudgeArm, number> = { anchor_echo: 0.4, neutral: 0.4, silence: 0.2 };
+
+function copyFor(arm: NudgeArm, cue: Cue): { title: string; body: string } {
+  return arm === 'anchor_echo'
+    ? { title: 'Thread', body: `Haven't read after ${cue.anchor} yet today.` }
+    : { title: 'Thread', body: "Haven't read yet today." };
+}
 
 function identifierFor(date: string): string {
   return `nudge-${date}`;
@@ -74,17 +84,34 @@ export class Notifier {
       this.db.all<{ local_date: string }>('SELECT local_date FROM days WHERE sealed = 1').map((r) => r.local_date),
     );
 
+    const trialSeed = meta.get(this.db, 'trial_seed') ?? 'thread-default-seed';
     const plan = planSyncWindow({ next30Days, alreadyScheduled, sealedDays });
+
     for (const { date } of plan) {
+      const arm = weightedPick(trialSeed, `E5:${date}`, NUDGE_WEIGHTS);
+
+      if (arm === 'silence') {
+        // Nothing to schedule, and so nothing cancelToday() could ever
+        // void — delivered=1 immediately. A silence day is a complete,
+        // countable comparison point the moment it's assigned, not a
+        // pending one waiting on an OS notification.
+        this.db.run(
+          `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
+           VALUES (?, ?, 'nudge_hour', 'silence', 0, 1)`,
+          [Date.now(), date],
+        );
+        continue;
+      }
+
       await this.notifications.scheduleNotificationAsync({
         identifier: identifierFor(date),
-        content: DEFAULT_COPY,
+        content: copyFor(arm, cue),
         trigger: dateTrigger(date, cue.nudgeHour),
       });
       this.db.run(
         `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
-         VALUES (?, ?, 'nudge_hour', 'anchor_echo', 0, 0)`,
-        [Date.now(), date],
+         VALUES (?, ?, 'nudge_hour', ?, 0, 0)`,
+        [Date.now(), date, arm],
       );
     }
   }
@@ -92,13 +119,18 @@ export class Notifier {
   /**
    * On seal: cancel today's notification (a deterministic identifier,
    * so this works even across an app restart between scheduling and
-   * sealing) and void today's decision row. Voiding sets delivered
-   * back to 0 explicitly — the same value it started at — because a
-   * voided row and a not-yet-fired row must be indistinguishable from
-   * "genuinely delivered" ones in the eventual MRT analysis.
+   * sealing) and void today's decision row — but only if one was
+   * actually scheduled. A silence-arm row has nothing to cancel and
+   * must never be voided: it's already a valid, complete comparison
+   * point, and zeroing its delivered flag would bias the MRT estimate
+   * toward silence by erasing exactly the days silence "worked"
+   * (§13.4).
    */
   async cancelToday(today: string = logicalToday()): Promise<void> {
     await this.notifications.cancelScheduledNotificationAsync(identifierFor(today));
-    this.db.run("UPDATE decisions SET delivered = 0 WHERE local_date = ? AND point = 'nudge_hour'", [today]);
+    this.db.run(
+      "UPDATE decisions SET delivered = 0 WHERE local_date = ? AND point = 'nudge_hour' AND arm != 'silence'",
+      [today],
+    );
   }
 }
