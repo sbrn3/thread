@@ -1,21 +1,28 @@
 # Thread
 
-_A Bible reading app for one person._ A single-flow, gesture-driven reading
-ritual with a built-in experiment engine.
+_A Bible reading app for one person._
 
-The full specification is `../thread-plan.html` (v3.0). This README covers only
-what the plan doesn't: how to run this repo.
+Bible reading fails at the cue, not at motivation. Thread is a cue delivery
+system with a reading surface attached — one flow, no navigation, no streaks
+to defend, no plans to browse.
 
-## Try it
+**[Try the demo →](https://sbrn3.github.io/thread/)**
+a browser preview of the daily flow — arrival, recall, scripture, seal,
+weave. Nothing to install.
 
-[**Live demo →**](https://sbrn3.github.io/thread/) — an interactive preview of the designed daily
-flow (arrival → recall → scripture → seal → weave), running entirely in your browser. The real
-app is still early (see roadmap below); this is what it's built toward.
+**[Get the app →](https://github.com/sbrn3/thread/releases/latest)**
+download `thread.apk`, allow "install unknown apps," done. Android, free,
+no account, nothing leaves your phone.
 
-**Install on Android:** grab `thread.apk` from the
-[latest release](https://github.com/sbrn3/thread/releases/latest).
+The app itself is still early — the demo shows where it's headed. Building
+it yourself, or curious how it works? Read on.
 
-## Commands
+---
+
+## Building it
+
+The full specification is `../thread-plan.html` (v3.0). This section covers
+only what the plan doesn't: how to run this repo.
 
 ```sh
 npm start          # Expo dev server
@@ -24,7 +31,7 @@ npm test           # vitest — the simulation/invariant suite
 npm run typecheck  # tsc --noEmit, strict
 ```
 
-## Repository shape (plan §05)
+### Repository shape (plan §05)
 
 ```
 /src
@@ -43,7 +50,7 @@ npm run typecheck  # tsc --noEmit, strict
 /assets/bible  Bundled public-domain translation (W2 ✓)
 ```
 
-## Hard rules (enforced by tests, §13.6)
+### Hard rules (enforced by tests, §13.6)
 
 - `events` is append-only; migrations are additive-only.
 - `ts` / `local_date` (4 AM boundary) / `build_sha` are stamped by the writer.
@@ -52,20 +59,20 @@ npm run typecheck  # tsc --noEmit, strict
 - `/src/lab` never imports `/src/ui`; `/src/memory` never imports `/src/lab`;
   `/src/partner` has no code path to a network.
 
-## Install on the phone (Android)
+### Cutting a release
 
 Every push to `main` builds `thread.apk` in GitHub Actions (Actions → latest
-run → Artifacts). Tagging a version publishes it under **Releases**:
+run → Artifacts). Tagging a version publishes it under **Releases** — the
+link the app's own README points people to:
 
 ```sh
 git tag v0.1.0 && git push --tags
 ```
 
-Then on the phone: open the repo's Releases page, download `thread.apk`,
-and allow the install ("install unknown apps"). Updates install over the
-old version — the signing key is stable across builds.
+The signing key is stable across builds, so updates install over the old
+version with no extra steps on the phone.
 
-## Bible text (plan §07)
+### Bible text (plan §07)
 
 Bundled **WEB** (public domain) ships in `assets/bible/web.json` — the app
 always works offline. Regenerate it with `node scripts/build-bible.mjs`.
