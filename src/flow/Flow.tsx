@@ -9,6 +9,7 @@ import Animated, {
 import type { Services } from '../services';
 import { useSession } from '../state/session';
 import { logicalToday } from '../log/time';
+import type { Passage } from '../log/types';
 import { bundledChapterCount } from '../text';
 import { ArrivalZone } from './ArrivalZone';
 import { ScriptureZone } from './ScriptureZone';
@@ -26,7 +27,7 @@ interface FlowProps {
 // behind sealing until W5 makes the weave reachable any time via the
 // knot. Recall (zone 1b, W6a) is omitted entirely for now.
 export function Flow({ services }: FlowProps) {
-  const { db, log, text } = services;
+  const { db, log, text, memory } = services;
   const session = useSession();
   const reducedMotion = useReducedMotion();
 
@@ -123,6 +124,27 @@ export function Flow({ services }: FlowProps) {
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
 
+  const [candidates, setCandidates] = useState<Passage[]>([]);
+
+  useEffect(() => {
+    setCandidates(session.justFinishedBook ? memory.candidates(session.justFinishedBook) : []);
+  }, [session.justFinishedBook, memory]);
+
+  const handleMarkVerse = useCallback(
+    (verse: number) => {
+      memory.markCandidate({ book: session.book, chapter: session.chapter, verseStart: verse, verseEnd: verse });
+    },
+    [memory, session.book, session.chapter],
+  );
+
+  const handlePromote = useCallback(
+    (id: number) => {
+      memory.promote(id, today);
+      setCandidates((prev) => prev.filter((c) => c.id !== id));
+    },
+    [memory, today],
+  );
+
   if (session.loading) return null;
 
   return (
@@ -156,6 +178,7 @@ export function Flow({ services }: FlowProps) {
             scriptureTop.value = y;
             scriptureBottom.value = y + height;
           }}
+          onMarkVerse={handleMarkVerse}
         />
         <SealZone
           sealed={session.sealedToday}
@@ -180,6 +203,8 @@ export function Flow({ services }: FlowProps) {
               chapter={session.chapter}
               chapterCount={bundledChapterCount(session.book)}
               justFinishedBook={session.justFinishedBook}
+              candidates={candidates}
+              onPromote={handlePromote}
             />
           </>
         )}

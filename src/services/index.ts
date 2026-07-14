@@ -4,6 +4,7 @@ import type { SqlDb } from '../log/db';
 import { openAppDb } from '../log/expoDb';
 import { Log } from '../log/log';
 import { migrate } from '../log/schema';
+import { Memory } from '../memory/memory';
 import { createTextProvider, type TextProvider } from '../text';
 
 export interface Services {
@@ -11,6 +12,7 @@ export interface Services {
   log: Log;
   text: TextProvider;
   cue: CueService;
+  memory: Memory;
 }
 
 /**
@@ -28,5 +30,6 @@ export function createServices(): Services {
     apiBibleId: process.env.EXPO_PUBLIC_APIBIBLE_ID,
   });
   const cue = new CueService(db, log);
-  return { db, log, text, cue };
+  const memory = new Memory(db, log);
+  return { db, log, text, cue, memory };
 }
