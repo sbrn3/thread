@@ -7,7 +7,9 @@ import type { Log } from '../log/log';
 export interface Cue {
   anchor: string; // "my morning coffee"
   place: string; // "the armchair by the window"
-  nudgeHour: number; // 0–23, the backup hour
+  nudgeHour: number | null; // 0–23, the backup hour; null = no nudge at all
+  /** 3/3 on the onboarding recency check (§05). An anchor kept despite failing is stored false, not rejected. */
+  validated: boolean;
 }
 
 export class CueService {
@@ -17,22 +19,29 @@ export class CueService {
   ) {}
 
   current(): Cue | null {
-    const row = this.db.get<{ anchor: string; place: string; nudge_hour: number }>(
-      'SELECT anchor, place, nudge_hour FROM cue WHERE active = 1 ORDER BY id DESC LIMIT 1',
+    const row = this.db.get<{ anchor: string; place: string; nudge_hour: number | null; validated: number }>(
+      'SELECT anchor, place, nudge_hour, validated FROM cue WHERE active = 1 ORDER BY id DESC LIMIT 1',
     );
-    return row ? { anchor: row.anchor, place: row.place, nudgeHour: row.nudge_hour } : null;
+    return row
+      ? { anchor: row.anchor, place: row.place, nudgeHour: row.nudge_hour, validated: row.validated === 1 }
+      : null;
   }
 
-  /** Writes cue_changed → the lab flags the active phase disturbed (§09). */
-  set(c: Cue, now: () => number = Date.now): void {
+  /**
+   * Writes cue_changed → the lab flags the active phase disturbed
+   * (§09). `firstSet` skips that log — onboarding's initial cue isn't
+   * an edit of a prior one, so it isn't a confound.
+   */
+  set(c: Cue, opts: { firstSet?: boolean; now?: () => number } = {}): void {
+    const now = opts.now ?? Date.now;
     this.db.tx(() => {
       this.db.run('UPDATE cue SET active = 0 WHERE active = 1');
       this.db.run(
-        'INSERT INTO cue (anchor, place, nudge_hour, set_at, active) VALUES (?, ?, ?, ?, 1)',
-        [c.anchor, c.place, c.nudgeHour, now()],
+        'INSERT INTO cue (anchor, place, nudge_hour, validated, set_at, active) VALUES (?, ?, ?, ?, ?, 1)',
+        [c.anchor, c.place, c.nudgeHour, c.validated ? 1 : 0, now()],
       );
     });
-    this.log.write({ type: 'cue_changed' });
+    if (!opts.firstSet) this.log.write({ type: 'cue_changed' });
   }
 
   /**

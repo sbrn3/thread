@@ -153,8 +153,14 @@ const V2: string[] = [
   )`,
 ];
 
+// v3 — onboarding's anchor-validation gate (§05 updated plan). A cue
+// the user insists on despite failing the 3/3 recency check is still
+// stored (validated=0), and is the first thing R1 points at if
+// cue_strength is low.
+const V3: string[] = [`ALTER TABLE cue ADD COLUMN validated INTEGER DEFAULT 0`];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2];
+export const MIGRATIONS: string[][] = [V1, V2, V3];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

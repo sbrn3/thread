@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ApiBibleProvider, parseChapter } from '../src/text/apiBible';
+import { ApiBibleProvider, parseChapter, resolveNivBibleId } from '../src/text/apiBible';
 import { CANON } from '../src/text/canon';
 import { BundledProvider, ChainedProvider, type BundledBible } from '../src/text/provider';
 import { splitSittings } from '../src/text/sittings';
-import { migrate, schemaVersion } from '../src/log/schema';
+import { migrate, MIGRATIONS, schemaVersion } from '../src/log/schema';
 import { openTestDb } from './util/testDb';
 
 let web: BundledBible;
@@ -64,7 +64,7 @@ describe('migration v2 — chapter cache', () => {
   it('migrates 0 → 2 and 1 → 2 additively', () => {
     const db = openTestDb();
     migrate(db);
-    expect(schemaVersion(db)).toBe(2);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
     db.run(
       `INSERT INTO chapter_cache (translation, book, chapter, verses_json, fetched_at)
        VALUES ('NIV', 'john', 3, '[]', 0)`,
@@ -86,6 +86,44 @@ const apiContent = [
   },
 ];
 
+// Fake API.Bible backend: routes the bible-listing lookup and the
+// chapter fetch to their documented (§ verified 2026-07-14) shapes.
+function fakeApiBible(opts: { listCalls?: { count: number }; chapterCalls?: { count: number } } = {}) {
+  return (async (url: string) => {
+    if (url.includes('/bibles') && !url.includes('/chapters/')) {
+      if (opts.listCalls) opts.listCalls.count++;
+      return {
+        ok: true,
+        json: async () => ({ data: [{ id: 'niv-uuid', name: 'New International Version', abbreviation: 'NIV' }] }),
+      };
+    }
+    if (opts.chapterCalls) opts.chapterCalls.count++;
+    return { ok: true, json: async () => ({ data: { content: apiContent, copyright: 'NIV © Biblica' } }) };
+  }) as unknown as typeof fetch;
+}
+
+describe('resolveNivBibleId', () => {
+  it('hits rest.api.bible (not the old, wrong api.scripture.api.bible host) and picks the NIV entry', async () => {
+    let calledUrl = '';
+    const fetchFn = (async (url: string) => {
+      calledUrl = url;
+      return { ok: true, json: async () => ({ data: [{ id: 'other', name: 'Other', abbreviation: 'XYZ' },
+        { id: 'niv-uuid', name: 'New International Version', abbreviation: 'NIV' }] }) };
+    }) as unknown as typeof fetch;
+
+    expect(await resolveNivBibleId('k', fetchFn)).toBe('niv-uuid');
+    expect(calledUrl).toBe('https://rest.api.bible/v1/bibles');
+  });
+
+  it('throws when no NIV entry is available for the key', async () => {
+    const fetchFn = (async () => ({
+      ok: true,
+      json: async () => ({ data: [{ id: 'x', name: 'King James Version', abbreviation: 'KJV' }] }),
+    })) as unknown as typeof fetch;
+    await expect(resolveNivBibleId('k', fetchFn)).rejects.toThrow(/No NIV/);
+  });
+});
+
 describe('ApiBibleProvider (Path A)', () => {
   it('parses API.Bible JSON content into verses with paragraph starts', () => {
     const verses = parseChapter(apiContent, 'john', 1);
@@ -95,30 +133,24 @@ describe('ApiBibleProvider (Path A)', () => {
     expect(verses[1].paragraphStart).toBeUndefined();
   });
 
-  it('caches on read — second call needs no network', async () => {
+  it('caches on read — second call needs no network, and resolves the bible id only once', async () => {
     const db = openTestDb();
     migrate(db);
-    let calls = 0;
-    const fetchFn = (async () => {
-      calls++;
-      return {
-        ok: true,
-        json: async () => ({ data: { content: apiContent, copyright: 'NIV © Biblica' } }),
-      };
-    }) as unknown as typeof fetch;
+    const listCalls = { count: 0 };
+    const chapterCalls = { count: 0 };
+    const fetchFn = fakeApiBible({ listCalls, chapterCalls });
 
-    const p = new ApiBibleProvider({ apiKey: 'k', bibleId: 'niv-id', db, fetchFn, now: () => 1 });
+    const p = new ApiBibleProvider({ apiKey: 'k', db, fetchFn, now: () => 1 });
     await p.getChapter('john', 1);
     await p.getChapter('john', 1);
-    expect(calls).toBe(1);
+    expect(chapterCalls.count).toBe(1);
+    expect(listCalls.count).toBe(1); // resolved once, then cached in meta
     expect(p.attribution()).toBe('NIV © Biblica'); // licence notice from the API
   });
 
   it('never exposes a bulk-download path — one chapter per call, by construction', () => {
     const methods = Object.getOwnPropertyNames(ApiBibleProvider.prototype);
-    expect(methods.sort()).toEqual(
-      ['attribution', 'constructor', 'getChapter', 'readCache', 'writeCache'].sort(),
-    );
+    expect(methods.sort()).toEqual(['attribution', 'constructor', 'getChapter', 'resolveBibleId'].sort());
   });
 });
 
@@ -128,7 +160,6 @@ describe('ChainedProvider — NIV over WEB floor', () => {
     migrate(db);
     const failing = new ApiBibleProvider({
       apiKey: 'k',
-      bibleId: 'niv-id',
       db,
       fetchFn: (async () => {
         throw new Error('offline');

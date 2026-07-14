@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_SIGNATURES, ladder } from '../src/lab/ladder';
+import { ALL_SIGNATURES, ladder, mechanicFrictionThreshold } from '../src/lab/ladder';
 import { PHASES_PER_EXPERIMENT, phaseArm } from '../src/lab/phases';
 import { hashSeed, mulberry32, seededBool, seededUniform } from '../src/lab/prng';
 import { meta } from '../src/log/log';
@@ -35,27 +35,43 @@ describe('phase assignment (§13.4)', () => {
   });
 });
 
-describe('the lapse ladder (§13.4)', () => {
+describe('the lapse ladder (§11)', () => {
   it('is graduated: boring → silent dose drop → one question → offramp → dormant', () => {
-    expect(ladder(1, 'healthy', true)).toEqual({ action: 'none' });
-    expect(ladder(3, 'healthy', true)).toEqual({ action: 'reduce_dose', silent: true });
+    expect(ladder(1, 'drift', true)).toEqual({ action: 'none' });
+    expect(ladder(3, 'drift', true)).toEqual({ action: 'reduce_dose', silent: true });
     expect(ladder(6, 'book_fatigue', true)).toEqual({
       action: 'one_question',
       route: 'book_fatigue',
     });
-    expect(ladder(10, 'healthy', false)).toEqual({
+    expect(ladder(10, 'drift', false)).toEqual({
       action: 'offramp',
       options: ['pause', 'keep_nudging'],
     });
-    expect(ladder(20, 'healthy', false)).toEqual({ action: 'dormant', farewell: 'silent' });
+    expect(ladder(20, 'drift', false)).toEqual({ action: 'dormant', farewell: 'silent' });
   });
 
   it('offers hand-off only when a partner exists', () => {
-    expect(ladder(10, 'healthy', true).action).toBe('offramp');
-    expect((ladder(10, 'healthy', true) as { options: string[] }).options).toContain('handoff');
-    expect((ladder(10, 'healthy', false) as { options: string[] }).options).not.toContain(
-      'handoff',
-    );
+    expect(ladder(10, 'drift', true).action).toBe('offramp');
+    expect((ladder(10, 'drift', true) as { options: string[] }).options).toContain('handoff');
+    expect((ladder(10, 'drift', false) as { options: string[] }).options).not.toContain('handoff');
+  });
+
+  it('life_disruption overrides the normal gap thresholds: nothing for 7 days, full stop', () => {
+    for (let gap = 2; gap <= 7; gap++) {
+      expect(ladder(gap, 'life_disruption', true)).toEqual({ action: 'none' });
+    }
+    // Day 8 onward, the normal ladder resumes wherever the gap lands —
+    // here, the offramp tier (8–14). The override exactly covers the
+    // one_question range (1–7), so life_disruption never produces it.
+    expect(ladder(8, 'life_disruption', true)).toEqual({
+      action: 'offramp',
+      options: ['pause', 'keep_nudging', 'handoff'],
+    });
+  });
+
+  it('mechanicFrictionThreshold fires above 15% hold_cancel, independent of any gap', () => {
+    expect(mechanicFrictionThreshold(0.14)).toBe(false);
+    expect(mechanicFrictionThreshold(0.16)).toBe(true);
   });
 
   it('app never contacts the partner — all 365 × signature × partner combinations', () => {

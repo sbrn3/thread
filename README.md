@@ -35,13 +35,14 @@ npm run typecheck  # tsc --noEmit, strict
 
 ```
 /src
+  /onboarding  Premise·anchor·place·net·translation·books·safekeeping  (§05 ✓)
   /flow      Arrival · Recall · Scripture · Seal · Weave · Dismissal   (W3–W6a)
   /knot      Sheet: weave, chapter strip, cue editor                   (W5)
-  /cue       Cue model, cue_strength metric                            (W1 ✓ / W6b)
+  /cue       Cue model, cue_strength metric, anchor validation         (W1 ✓ / W6b / §05)
   /notify    Rolling 30d window, cancel-on-seal + decision voiding     (W6b)
-  /text      TextProvider, sitting splitter                            (W2)
+  /text      TextProvider (WEB/NIV/ESV), sitting splitter              (W2 ✓ / §08)
   /log       Event log: schema, driver, writer, time                   (W1 ✓)
-  /lab       PRNG, phase assignment, ladder, reconcile skeleton        (W1 ✓ / W7–W9)
+  /lab       PRNG, phase assignment, ladder (6 signatures), reconcile  (W1 ✓ / W7–W9)
   /memory    Leitner scheduler                                         (W1 ✓ / W6a)
   /partner   Hand-off only. No network, by construction                (W11b)
   /backup    Encrypted export/restore                                  (W10)
@@ -72,23 +73,23 @@ git tag v0.1.0 && git push --tags
 The signing key is stable across builds, so updates install over the old
 version with no extra steps on the phone.
 
-### Bible text (plan §07)
+### Bible text (plan §08)
 
 Bundled **WEB** (public domain) ships in `assets/bible/web.json` — the app
 always works offline. Regenerate it with `node scripts/build-bible.mjs`.
 
-**NIV (licensed, Path A):** create a free non-commercial key at
-https://scripture.api.bible, note the NIV bible id listed for your account,
-and set both at build time:
+**NIV or ESV (licensed):** chosen in-app, at onboarding's translation
+screen — not at build time. The API key is entered on-device and stored in
+SQLite (`meta` table), never compiled into the build or committed to the
+repo. NIV needs only a free key from api.bible (the specific NIV bible id
+is resolved automatically from the key via `/v1/bibles`); ESV needs a free
+key from api.esv.org, which requires accepting Crossway's statement of
+faith. Whichever is chosen is cached per chapter after first fetch and
+falls back to WEB automatically with no network. Each provider's required
+copyright notice renders under every chapter via `attribution()`, and
+neither provider has a method capable of bulk-downloading the translation.
 
-```sh
-# .env (never committed) or CI secrets
-EXPO_PUBLIC_APIBIBLE_KEY=your-key
-EXPO_PUBLIC_APIBIBLE_ID=your-niv-bible-id
-```
-
-With the key present the app reads NIV (cached per chapter after first
-fetch, offline thereafter) and falls back to WEB with no network. The
-licence's copyright notice renders under every NIV chapter via
-`attribution()`. Bulk-downloading the translation is not permitted and
-the provider deliberately has no method for it.
+The ESV integration (`src/text/esv.ts`) was built from published API docs,
+not exercised against a live key — there was none available to test with.
+The parser is unit-tested against the documented response shape; smoke-test
+it against a real key before relying on it day to day.

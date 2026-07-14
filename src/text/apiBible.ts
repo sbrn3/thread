@@ -1,5 +1,7 @@
+import { meta } from '../log/log';
 import type { SqlDb } from '../log/db';
 import { CANON } from './canon';
+import { readCachedChapter, writeCachedChapter } from './chapterCache';
 import type { TextProvider, Verse } from './provider';
 
 // Path A (§07): NIV via API.Bible, free non-commercial Starter tier.
@@ -7,6 +9,13 @@ import type { TextProvider, Verse } from './provider';
 // fetch, so re-reading is offline. Bulk-downloading the translation
 // is NOT permitted by the licence — there is deliberately no method
 // here that fetches more than one chapter.
+//
+// Base host verified against docs.api.bible (2026-07-14): rest.api.bible.
+// An earlier version of this file used api.scripture.api.bible, which
+// is wrong — fixed here rather than left to fail silently into the
+// WEB fallback forever.
+
+const API_BASE = 'https://rest.api.bible/v1';
 
 // The copyright notice is a condition of the licence (§07). It is
 // rendered under every chapter; the real string for the account's
@@ -17,9 +26,7 @@ const NIV_NOTICE =
   'Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc. Used by permission. All rights reserved worldwide.';
 
 export interface ApiBibleConfig {
-  apiKey: string;
-  /** The NIV bible id shown for your key at api.scripture.api.bible (varies per account). */
-  bibleId: string;
+  apiKey: string; // onboarding collects only this — the NIV bible id is resolved from it, not asked for
   db: SqlDb;
   fetchFn?: typeof fetch;
   now?: () => number;
@@ -34,25 +41,23 @@ interface ApiContentItem {
 }
 
 export class ApiBibleProvider implements TextProvider {
-  private readonly cfg: Required<Pick<ApiBibleConfig, 'apiKey' | 'bibleId' | 'db'>> &
-    ApiBibleConfig;
   private notice: string = NIV_NOTICE;
+  private bibleId: string | null = null;
 
-  constructor(cfg: ApiBibleConfig) {
-    this.cfg = cfg;
-  }
+  constructor(private readonly cfg: ApiBibleConfig) {}
 
   async getChapter(book: string, ch: number): Promise<Verse[]> {
-    const cached = this.readCache(book, ch);
+    const cached = readCachedChapter(this.cfg.db, 'NIV', book, ch);
     if (cached) return cached;
 
     const usfm = CANON.find((b) => b.id === book)?.usfm;
     if (!usfm) throw new Error(`Unknown book id: ${book}`);
 
+    const bibleId = await this.resolveBibleId();
     const fetchFn = this.cfg.fetchFn ?? fetch;
     const url =
-      `https://api.scripture.api.bible/v1/bibles/${this.cfg.bibleId}` +
-      `/chapters/${usfm}.${ch}?content-type=json&include-notes=false&include-titles=false`;
+      `${API_BASE}/bibles/${bibleId}/chapters/${usfm}.${ch}` +
+      `?content-type=json&include-notes=false&include-titles=false`;
     const res = await fetchFn(url, { headers: { 'api-key': this.cfg.apiKey } });
     if (!res.ok) throw new Error(`API.Bible ${res.status} for ${book} ${ch}`);
 
@@ -63,7 +68,7 @@ export class ApiBibleProvider implements TextProvider {
 
     const verses = parseChapter(body.data.content, book, ch);
     if (verses.length === 0) throw new Error(`API.Bible returned no verses for ${book} ${ch}`);
-    this.writeCache(book, ch, verses);
+    writeCachedChapter(this.cfg.db, 'NIV', book, ch, verses, this.cfg.now);
     return verses;
   }
 
@@ -71,23 +76,34 @@ export class ApiBibleProvider implements TextProvider {
     return this.notice;
   }
 
-  private readCache(book: string, ch: number): Verse[] | null {
-    const row = this.cfg.db.get<{ verses_json: string }>(
-      'SELECT verses_json FROM chapter_cache WHERE translation = ? AND book = ? AND chapter = ?',
-      ['NIV', book, ch],
-    );
-    return row ? (JSON.parse(row.verses_json) as Verse[]) : null;
+  /** Resolved once per key, then cached in meta so later app opens skip the lookup. */
+  private async resolveBibleId(): Promise<string> {
+    if (this.bibleId) return this.bibleId;
+    const cached = meta.get(this.cfg.db, 'niv_bible_id');
+    if (cached) {
+      this.bibleId = cached;
+      return cached;
+    }
+    const resolved = await resolveNivBibleId(this.cfg.apiKey, this.cfg.fetchFn ?? fetch);
+    meta.set(this.cfg.db, 'niv_bible_id', resolved);
+    this.bibleId = resolved;
+    return resolved;
   }
+}
 
-  private writeCache(book: string, ch: number, verses: Verse[]): void {
-    this.cfg.db.run(
-      `INSERT INTO chapter_cache (translation, book, chapter, verses_json, fetched_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(translation, book, chapter) DO UPDATE SET
-         verses_json = excluded.verses_json, fetched_at = excluded.fetched_at`,
-      ['NIV', book, ch, JSON.stringify(verses), (this.cfg.now ?? Date.now)()],
-    );
-  }
+/**
+ * The NIV bible id is a UUID that identifies the translation resource
+ * itself on API.Bible, not something onboarding should ask the user
+ * to hunt down — resolved here from the account's own /v1/bibles
+ * listing instead of hardcoding a value nobody can verify offline.
+ */
+export async function resolveNivBibleId(apiKey: string, fetchFn: typeof fetch = fetch): Promise<string> {
+  const res = await fetchFn(`${API_BASE}/bibles`, { headers: { 'api-key': apiKey } });
+  if (!res.ok) throw new Error(`API.Bible ${res.status} listing bibles`);
+  const body = (await res.json()) as { data: Array<{ id: string; name: string; abbreviation?: string }> };
+  const niv = body.data.find((b) => b.abbreviation === 'NIV' || /new international version/i.test(b.name));
+  if (!niv) throw new Error('No NIV translation available for this API.Bible key');
+  return niv.id;
 }
 
 /**

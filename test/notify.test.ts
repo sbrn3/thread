@@ -63,7 +63,7 @@ describe('Notifier (§13.3 /src/notify, §08)', () => {
     const fake = fakeNotifications();
     const notifier = new Notifier(db, fake);
 
-    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21 }, '2026-07-14');
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, '2026-07-14');
 
     const rows = db.all<{ local_date: string; delivered: number }>(
       "SELECT * FROM decisions WHERE point = 'nudge_hour'",
@@ -80,7 +80,7 @@ describe('Notifier (§13.3 /src/notify, §08)', () => {
     fake.getPermissionsAsync = async () => ({ status: 'denied', canAskAgain: false });
     const notifier = new Notifier(db, fake);
 
-    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21 }, '2026-07-14');
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, '2026-07-14');
 
     expect(db.all('SELECT * FROM decisions')).toHaveLength(0);
     expect(fake.scheduled.size).toBe(0);
@@ -105,7 +105,7 @@ describe('Notifier (§13.3 /src/notify, §08)', () => {
     const notifier = new Notifier(db, fake);
     const today = '2026-07-14';
 
-    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21 }, today);
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
     // Today itself isn't in the "next 30 days" window (strictly future), so
     // schedule it directly to exercise cancellation the same way an
     // already-scheduled day would look after a prior syncWindow ran.

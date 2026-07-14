@@ -55,8 +55,13 @@ export class Notifier {
     return requested.status as 'granted' | 'denied' | 'undetermined';
   }
 
-  /** Maintains the rolling 30-day schedule. No-ops silently if permission isn't granted. */
+  /**
+   * Maintains the rolling 30-day schedule. No-ops silently if
+   * permission isn't granted, or if the cue has no nudge hour at all
+   * ("No nudge at all" is a valid onboarding choice — §05).
+   */
   async syncWindow(cue: Cue, today: string = logicalToday()): Promise<void> {
+    if (cue.nudgeHour === null) return;
     if ((await this.permission()) !== 'granted') return;
 
     const next30Days = Array.from({ length: 30 }, (_, i) => addDays(today, i + 1));

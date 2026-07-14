@@ -12,9 +12,11 @@ const DEFAULT_CUE: Cue = {
   anchor: 'my morning coffee',
   place: 'the armchair by the window',
   nudgeHour: 21,
+  validated: false,
 };
 
-function formatHour(h: number): string {
+function formatHour(h: number | null): string {
+  if (h === null) return 'no reminder';
   const period = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:00 ${period}`;
@@ -38,12 +40,21 @@ export function CueEditor({ cue, onSave }: CueEditorProps) {
   };
 
   const commitEdit = () => {
-    if (editing) onSave({ ...current, [editing]: draft.trim() || current[editing] });
+    if (editing) {
+      const value = draft.trim() || current[editing];
+      // Editing the anchor via the knot doesn't re-run the 3-question
+      // validation (that lives in onboarding) — so a changed anchor's
+      // validated flag reverts to false rather than carrying forward
+      // a verdict about text that no longer exists.
+      const validated = editing === 'anchor' && value !== current.anchor ? false : current.validated;
+      onSave({ ...current, [editing]: value, validated });
+    }
     setEditing(null);
   };
 
   const adjustHour = (delta: number) => {
-    onSave({ ...current, nudgeHour: (current.nudgeHour + delta + 24) % 24 });
+    const base = current.nudgeHour ?? 21;
+    onSave({ ...current, nudgeHour: (base + delta + 24) % 24 });
   };
 
   return (

@@ -42,4 +42,12 @@ describe('schema + migration harness (W1)', () => {
     db.run(`INSERT INTO partner (id, name) VALUES (1, 'A')`);
     expect(() => db.run(`INSERT INTO partner (id, name) VALUES (2, 'B')`)).toThrow();
   });
+
+  it('v3 adds cue.validated (§05 onboarding anchor-recency check)', () => {
+    const db = openTestDb();
+    migrate(db);
+    db.run(`INSERT INTO cue (anchor, place, nudge_hour, validated, set_at, active) VALUES ('c', 'p', 21, 1, 0, 1)`);
+    const row = db.get<{ validated: number }>('SELECT validated FROM cue');
+    expect(row?.validated).toBe(1);
+  });
 });

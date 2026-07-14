@@ -7,9 +7,11 @@ import { bundledChapterCount } from '../text';
 import type { TextProvider, Verse } from '../text/provider';
 import { splitSittings, type Sitting } from '../text/sittings';
 
-// §04 — one book at a time. Finish it, then choose the next.
-// W3 default-advances through the canon in order; the searchable
-// next-book chooser (§03) is a knot-sheet concern (W5).
+// §04 — one book at a time. Onboarding (§05) requires picking both a
+// current book and a next one before it can complete, so by the time
+// this ever runs, current_book/next_book are already set — the
+// Genesis/canon-order fallbacks below are a defensive backstop for
+// onboarding-bypassed states (tests), not the primary path.
 
 export interface SessionState {
   loading: boolean;
@@ -115,12 +117,23 @@ export const useSession = create<SessionState>((set, get) => ({
       } else {
         log.write({ type: 'book_finish', book, chapter });
         finishedBook = book;
-        const next = nextBook(book);
-        nextBookId = next?.id ?? book; // stays on the last book if the canon is exhausted
+        // §05 onboarding queues the next book one deep; consume it
+        // here. Canon order is only a defensive fallback for the
+        // onboarding-bypassed case (see module comment above).
+        const queued = meta.get(db, 'next_book');
+        const next = queued ?? nextBook(book)?.id ?? null;
+        nextBookId = next ?? book; // stays on the last book if the canon is exhausted
         nextChapter = 1;
         nextSittingIndex = 0;
         bookStarted = today;
-        if (next) log.write({ type: 'book_start', book: nextBookId, chapter: 1 });
+        if (next) {
+          log.write({ type: 'book_start', book: nextBookId, chapter: 1 });
+          // Re-seed the queue so it stays one deep — a placeholder
+          // pick (canon order) until the dismissal zone offers a real
+          // re-pick, which is deferred past this pass.
+          const reseed = nextBook(nextBookId)?.id;
+          if (reseed) meta.set(db, 'next_book', reseed);
+        }
       }
     }
 
