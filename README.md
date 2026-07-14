@@ -56,7 +56,23 @@ Then on the phone: open the repo's Releases page, download `thread.apk`,
 and allow the install ("install unknown apps"). Updates install over the
 old version — the signing key is stable across builds.
 
-## What's still needed (see plan §07, §13)
+## Bible text (plan §07)
 
-1. **Bundled translation** — a WEB (public domain) JSON for `/assets/bible`.
-2. **NIV (optional, Path A)** — an API.Bible key; add `ApiBibleProvider`.
+Bundled **WEB** (public domain) ships in `assets/bible/web.json` — the app
+always works offline. Regenerate it with `node scripts/build-bible.mjs`.
+
+**NIV (licensed, Path A):** create a free non-commercial key at
+https://scripture.api.bible, note the NIV bible id listed for your account,
+and set both at build time:
+
+```sh
+# .env (never committed) or CI secrets
+EXPO_PUBLIC_APIBIBLE_KEY=your-key
+EXPO_PUBLIC_APIBIBLE_ID=your-niv-bible-id
+```
+
+With the key present the app reads NIV (cached per chapter after first
+fetch, offline thereafter) and falls back to WEB with no network. The
+licence's copyright notice renders under every NIV chapter via
+`attribution()`. Bulk-downloading the translation is not permitted and
+the provider deliberately has no method for it.

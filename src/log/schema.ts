@@ -140,8 +140,21 @@ const V1: string[] = [
   )`,
 ];
 
+// v2 — chapter cache for the API.Bible provider (§07 Path A).
+// Cache-on-read only; a cache, not evidence — but still additive.
+const V2: string[] = [
+  `CREATE TABLE IF NOT EXISTS chapter_cache (
+    translation TEXT NOT NULL,
+    book TEXT NOT NULL,
+    chapter INTEGER NOT NULL,
+    verses_json TEXT NOT NULL,
+    fetched_at INTEGER NOT NULL,
+    PRIMARY KEY (translation, book, chapter)
+  )`,
+];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1];
+export const MIGRATIONS: string[][] = [V1, V2];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { migrate, schemaVersion } from '../src/log/schema';
+import { MIGRATIONS, migrate, schemaVersion } from '../src/log/schema';
 import { openTestDb } from './util/testDb';
 
 describe('schema + migration harness (W1)', () => {
-  it('migrates empty → v1 clean', () => {
+  it('migrates empty → latest clean', () => {
     const db = openTestDb();
     expect(schemaVersion(db)).toBe(0);
     migrate(db);
-    expect(schemaVersion(db)).toBe(1);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
 
     const tables = db
       .all<{ name: string }>(`SELECT name FROM sqlite_master WHERE type = 'table'`)
@@ -33,7 +33,7 @@ describe('schema + migration harness (W1)', () => {
     const db = openTestDb();
     migrate(db);
     migrate(db);
-    expect(schemaVersion(db)).toBe(1);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
   });
 
   it('partner table admits exactly one row (a dyad, not a group)', () => {
