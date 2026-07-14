@@ -53,7 +53,7 @@ jobs:
         env:
           # Stamped into every event row (§13.2)
           EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk thread.apk
