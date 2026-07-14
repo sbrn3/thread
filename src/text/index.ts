@@ -14,6 +14,16 @@ export interface TextConfig {
   apiBibleId?: string;
 }
 
+/**
+ * Chapter counts follow the bundled WEB versification regardless of
+ * which provider is actually serving text — the only canon-complete
+ * offline data we have. NIV chapter/verse boundaries match closely
+ * enough for navigation purposes (book_finish, next-chapter advance).
+ */
+export function bundledChapterCount(book: string): number {
+  return WEB.books[book]?.length ?? 0;
+}
+
 /** NIV when licensed + reachable/cached; bundled WEB as the offline floor. */
 export function createTextProvider(cfg: TextConfig): TextProvider {
   const bundled = new BundledProvider(WEB);
