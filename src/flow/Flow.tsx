@@ -9,9 +9,11 @@ import Animated, {
 import type { Services } from '../services';
 import { useSession } from '../state/session';
 import { logicalToday } from '../log/time';
-import type { Passage } from '../log/types';
+import type { Grade, Passage } from '../log/types';
+import { DAILY_RECALL_CAP } from '../memory/leitner';
 import { bundledChapterCount } from '../text';
 import { ArrivalZone } from './ArrivalZone';
+import { RecallZone } from './RecallZone';
 import { ScriptureZone } from './ScriptureZone';
 import { SealZone } from './SealZone';
 import { WeaveZone } from './WeaveZone';
@@ -22,10 +24,10 @@ interface FlowProps {
   services: Services;
 }
 
-// §04 — one flow, no navigation: Arrival → Scripture → Seal → Weave →
-// Dismissal, one continuous scroll. Weave + Dismissal are gated
-// behind sealing until W5 makes the weave reachable any time via the
-// knot. Recall (zone 1b, W6a) is omitted entirely for now.
+// §04 — one flow, no navigation: Arrival → Recall (if due) →
+// Scripture → Seal → Weave → Dismissal, one continuous scroll. Weave
+// is also reachable any time via the knot (W5), independent of
+// today's seal.
 export function Flow({ services }: FlowProps) {
   const { db, log, text, memory } = services;
   const session = useSession();
@@ -145,6 +147,42 @@ export function Flow({ services }: FlowProps) {
     [memory, today],
   );
 
+  // §04 zone 1b — only if due; the zone does not exist otherwise.
+  const [dueToday, setDueToday] = useState<Passage[]>([]);
+  const recallShownLogged = useRef(false);
+
+  useEffect(() => {
+    if (session.loading) return;
+    const due = memory.due(today).slice(0, DAILY_RECALL_CAP);
+    setDueToday(due);
+    if (due.length > 0 && !recallShownLogged.current) {
+      recallShownLogged.current = true;
+      log.write({ type: 'recall_shown' });
+    }
+  }, [session.loading, memory, today, log]);
+
+  const getVerseText = useCallback(
+    async (p: Passage) => {
+      const verses = await text.getChapter(p.book, p.chapter);
+      return verses
+        .filter((v) => v.verse >= p.verse_start && v.verse <= p.verse_end)
+        .map((v) => v.text)
+        .join(' ');
+    },
+    [text],
+  );
+
+  const handleGradeRecall = useCallback(
+    (id: number, grade: Grade) => {
+      memory.grade(id, grade, today);
+    },
+    [memory, today],
+  );
+
+  const handleSkipRecall = useCallback(() => {
+    log.write({ type: 'recall_skipped' });
+  }, [log]);
+
   if (session.loading) return null;
 
   return (
@@ -171,6 +209,14 @@ export function Flow({ services }: FlowProps) {
           sittingsTotal={session.sittings.length}
           daysInBook={session.daysInBook}
         />
+        {dueToday.length > 0 && (
+          <RecallZone
+            passages={dueToday}
+            getVerseText={getVerseText}
+            onGrade={handleGradeRecall}
+            onSkip={handleSkipRecall}
+          />
+        )}
         <ScriptureZone
           verses={session.sittings[session.sittingIndex] ?? []}
           attribution={session.attribution}

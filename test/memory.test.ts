@@ -125,4 +125,30 @@ describe('Memory (§13.3 /src/memory, §21)', () => {
     expect(memory.marksPerChapter('2026-07-01', '2026-07-02')).toBe(1.5); // 3 marks / 2 chapters
     void log;
   });
+
+  it('a failed recall provably touches nothing: seal/streak/weave/dose are byte-identical for held vs lost (§13.5 W6a)', () => {
+    const OTHER_TABLES = ['days', 'cue', 'bandit', 'decisions', 'exp_phases', 'srbai', 'reports', 'meta', 'partner'];
+
+    function run(grade: 'held' | 'lost') {
+      const db = openTestDb();
+      migrate(db);
+      const log = new Log({ db, buildSha: 'test-sha' });
+      const memory = new Memory(db, log);
+
+      db.run(
+        `INSERT INTO days (local_date, sealed, sealed_before_nudge, book, chapter, dose)
+         VALUES ('2026-07-14', 1, 1, 'john', 3, 'full_chapter')`,
+      );
+      db.run(`INSERT INTO cue (anchor, place, nudge_hour, set_at, active) VALUES ('coffee', 'chair', 21, 0, 1)`);
+
+      memory.markCandidate({ book: 'john', chapter: 3, verseStart: 16, verseEnd: 16 }, () => 1);
+      const [{ id }] = memory.candidates('john');
+      memory.promote(id, '2026-07-01');
+      memory.grade(id, grade, '2026-07-14');
+
+      return OTHER_TABLES.map((t) => db.all(`SELECT * FROM ${t}`));
+    }
+
+    expect(JSON.stringify(run('held'))).toBe(JSON.stringify(run('lost')));
+  });
 });
