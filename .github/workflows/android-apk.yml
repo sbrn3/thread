@@ -45,6 +45,9 @@ jobs:
       - name: Generate native project
         run: npx expo prebuild --platform android --no-install
 
+      - name: Raise Gradle JVM memory (default 2GB heap/512MB metaspace OOMs lint on this project)
+        run: echo "org.gradle.jvmargs=-Xmx5120m -XX:MaxMetaspaceSize=1536m" >> android/gradle.properties
+
       - name: Build release APK
         working-directory: android
         env:
