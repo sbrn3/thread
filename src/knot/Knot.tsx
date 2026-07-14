@@ -8,6 +8,7 @@ import type { Services } from '../services';
 import { bookName } from '../text/canon';
 import type { Verse } from '../text/provider';
 import { tokens } from '../ui/tokens';
+import { BackupSection } from './BackupSection';
 import { ChapterStrip, type ChapterEntry } from './ChapterStrip';
 import { CueEditor } from './CueEditor';
 
@@ -22,7 +23,7 @@ interface KnotProps {
  * read, and the cue editor. The only concession to non-linear use.
  */
 export function Knot({ services }: KnotProps) {
-  const { db, log, text, cue } = services;
+  const { db, log, text, cue, backup } = services;
   const today = useRef(logicalToday()).current;
 
   const [open, setOpen] = useState(false);
@@ -107,6 +108,9 @@ export function Knot({ services }: KnotProps) {
 
               <Text style={styles.sectionLabel}>The cue</Text>
               <CueEditor cue={cueState} onSave={handleCueSave} />
+
+              <Text style={styles.sectionLabel}>Backup</Text>
+              <BackupSection backup={backup} />
             </ScrollView>
           </View>
         </View>

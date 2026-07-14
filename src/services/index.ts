@@ -1,4 +1,7 @@
 import * as ExpoNotifications from 'expo-notifications';
+import { Backup } from '../backup';
+import { expoCrypto } from '../backup/expoAdapter';
+import { nativeBackupIo } from '../backup/nativeIo';
 import { CueService } from '../cue';
 import { BUILD_SHA } from '../log/buildSha';
 import type { SqlDb } from '../log/db';
@@ -16,6 +19,7 @@ export interface Services {
   cue: CueService;
   memory: Memory;
   notifier: Notifier;
+  backup: Backup;
 }
 
 /** Opens the one SQLite connection the app uses for its whole lifetime, migrated to latest. */
@@ -42,5 +46,6 @@ export function createServices(db: SqlDb): Services {
   const cue = new CueService(db, log);
   const memory = new Memory(db, log);
   const notifier = new Notifier(db, ExpoNotifications);
-  return { db, log, text, cue, memory, notifier };
+  const backup = new Backup(db, expoCrypto, nativeBackupIo);
+  return { db, log, text, cue, memory, notifier, backup };
 }
