@@ -6,6 +6,15 @@ ritual with a built-in experiment engine.
 The full specification is `../thread-plan.html` (v3.0). This README covers only
 what the plan doesn't: how to run this repo.
 
+## Try it
+
+[**Live demo →**](https://sbrn3.github.io/thread/) — an interactive preview of the designed daily
+flow (arrival → recall → scripture → seal → weave), running entirely in your browser. The real
+app is still early (see roadmap below); this is what it's built toward.
+
+**Install on Android:** grab `thread.apk` from the
+[latest release](https://github.com/sbrn3/thread/releases/latest).
+
 ## Commands
 
 ```sh
@@ -31,7 +40,7 @@ npm run typecheck  # tsc --noEmit, strict
   /backup    Encrypted export/restore                                  (W10)
   /ui        Design tokens                                             (W1 ✓)
 /test        vitest suite incl. §13.6 import-boundary invariants
-/assets/bible  Bundled public-domain translation (W2 — not yet added)
+/assets/bible  Bundled public-domain translation (W2 ✓)
 ```
 
 ## Hard rules (enforced by tests, §13.6)
