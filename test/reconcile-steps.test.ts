@@ -128,7 +128,7 @@ describe('advancePhase (§13.4 reconcile step 3, §13 "one reversal at a time")'
     expect(ctx.db.all('SELECT * FROM exp_phases')).toHaveLength(0);
   });
 
-  it('seeds the first queued experiment (E4) the day the 21-day baseline ends', () => {
+  it('seeds the first queued experiment (E7 — it runs first, §14) the day the 21-day baseline ends', () => {
     const ctx = setup();
     meta.set(ctx.db, 'trial_seed', 'fixed-seed');
     meta.set(ctx.db, 'trial_start', '2026-07-01');
@@ -138,7 +138,7 @@ describe('advancePhase (§13.4 reconcile step 3, §13 "one reversal at a time")'
     const row = ctx.db.get<{ exp_id: string; phase: number; status: string; start_date: string }>(
       'SELECT * FROM exp_phases',
     );
-    expect(row).toMatchObject({ exp_id: 'E4', phase: 0, status: 'active', start_date: '2026-07-22' });
+    expect(row).toMatchObject({ exp_id: 'E7', phase: 0, status: 'active', start_date: '2026-07-22' });
   });
 
   it('flips to the next phase when the active one ends, using the seeded arm sequence', () => {

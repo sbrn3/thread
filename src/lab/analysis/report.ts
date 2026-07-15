@@ -12,6 +12,7 @@ const ARM_LABELS: Record<string, { A: string; B: string; name: string }> = {
   E1: { A: 'Hold', B: 'Tap', name: 'HOLD-TO-SEAL' },
   E3: { A: 'Visible', B: 'Hidden', name: 'STREAK VISIBILITY' },
   E4: { A: 'Full chapter', B: 'One verse', name: 'COMPLETION FLOOR' },
+  E7: { A: 'Daily', B: '5 days/week', name: 'READING FREQUENCY' },
 };
 
 const RECOMMENDATION_TEMPLATES: Record<string, { A: string; B: string }> = {
@@ -26,6 +27,10 @@ const RECOMMENDATION_TEMPLATES: Record<string, { A: string; B: string }> = {
   E4: {
     A: 'Keep the full-chapter completion floor.',
     B: 'Lower the floor — any reading counts toward sealing the day.',
+  },
+  E7: {
+    A: 'Keep a daily target — every day is expected.',
+    B: 'Move to 5 days a week, any 5 — two rest days no longer count as misses.',
   },
 };
 

@@ -20,6 +20,8 @@ export type EventType =
   | 'recall_shown'
   | 'recall_graded' // held | partial | lost. Consequence-free.
   | 'recall_skipped' // one tap. Never penalised, never blocks the seal.
+  | 'probe_fired' // E9 — yesterday's chapter, randomized daily p=0.6
+  | 'probe_graded' // held | partial | lost | skipped. Consequence-free, same as recall.
   | 'handoff_offered' // day 14 / dormancy. Offer shown.
   | 'handoff_tapped'; // user opened Messages. NOTHING further is logged.
 

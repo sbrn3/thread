@@ -129,6 +129,47 @@ describe('Notifier (§13.3 /src/notify, §08, §10 E5 arm selection)', () => {
     expect(requestSpy).not.toHaveBeenCalled();
   });
 
+  it('E7 arm B: skips the nudge on a day where the trailing week already has 5 sealed days', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const today = '2026-07-14';
+    // An active E7 phase, arm B, covering a wide window including today's plan.
+    db.run(
+      `INSERT INTO exp_phases (exp_id, phase, arm, start_date, end_date, status)
+       VALUES ('E7', 0, 'B', '2026-07-01', '2026-08-01', 'active')`,
+    );
+    // 5 sealed days in the 7 days immediately before 2026-07-15 (tomorrow,
+    // the first planned date): 07-08..07-12.
+    for (const d of ['2026-07-08', '2026-07-09', '2026-07-10', '2026-07-11', '2026-07-12']) {
+      db.run(`INSERT INTO days (local_date, sealed, dose) VALUES (?, 1, 'full_chapter')`, [d]);
+    }
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
+
+    const tomorrowRow = db.get("SELECT 1 FROM decisions WHERE local_date = '2026-07-15' AND point = 'nudge_hour'");
+    expect(tomorrowRow).toBeUndefined(); // quota already met — no nudge needed
+  });
+
+  it('E7 arm A (or no active E7 phase): the weekly quota never suppresses a nudge', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const today = '2026-07-14';
+    for (const d of ['2026-07-08', '2026-07-09', '2026-07-10', '2026-07-11', '2026-07-12']) {
+      db.run(`INSERT INTO days (local_date, sealed, dose) VALUES (?, 1, 'full_chapter')`, [d]);
+    }
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
+
+    const tomorrowRow = db.get("SELECT 1 FROM decisions WHERE local_date = '2026-07-15' AND point = 'nudge_hour'");
+    expect(tomorrowRow).toBeDefined(); // no arm-B phase active — normal daily behaviour
+  });
+
   it('§13.5 W6b done-when: seal before the hour ⇒ silent all day AND the decision row is voided, not null-rewarded', async () => {
     const db = openTestDb();
     migrate(db);

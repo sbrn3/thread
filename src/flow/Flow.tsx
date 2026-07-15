@@ -7,6 +7,8 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import { getPendingReport, markApplied, type PendingReport } from '../lab/analysis/report';
+import { gradeProbe, resolveTodaysProbe, type DailyProbe, type ProbeGrade } from '../lab/probe';
+import { meta } from '../log/log';
 import type { Services } from '../services';
 import { useSession } from '../state/session';
 import { logicalToday } from '../log/time';
@@ -14,6 +16,7 @@ import type { Grade, Passage } from '../log/types';
 import { DAILY_RECALL_CAP } from '../memory/leitner';
 import { bundledChapterCount } from '../text';
 import { ArrivalZone } from './ArrivalZone';
+import { ProbeZone } from './ProbeZone';
 import { RecallZone } from './RecallZone';
 import { ScriptureZone } from './ScriptureZone';
 import { SealZone } from './SealZone';
@@ -226,6 +229,38 @@ export function Flow({ services }: FlowProps) {
     log.write({ type: 'recall_skipped' });
   }, [log]);
 
+  // §10/E9 — the next-day recall probe. Decided (and persisted) once
+  // per day; resolveTodaysProbe() is itself idempotent, so re-running
+  // this effect never re-rolls it.
+  const [probe, setProbe] = useState<DailyProbe | null>(null);
+  const probeFiredLogged = useRef(false);
+
+  useEffect(() => {
+    if (session.loading) return;
+    const trialSeed = meta.get(db, 'trial_seed') ?? 'thread-default-seed';
+    const todaysProbe = resolveTodaysProbe(db, today, trialSeed);
+    setProbe(todaysProbe);
+    if (todaysProbe && !probeFiredLogged.current) {
+      probeFiredLogged.current = true;
+      log.write({ type: 'probe_fired', book: todaysProbe.book, chapter: todaysProbe.chapter });
+    }
+  }, [session.loading, db, today, log]);
+
+  const getProbeChapterText = useCallback(async () => {
+    if (!probe) return '';
+    const verses = await text.getChapter(probe.book, probe.chapter);
+    return verses.map((v) => v.text).join(' ');
+  }, [text, probe]);
+
+  const handleGradeProbe = useCallback(
+    (grade: ProbeGrade) => {
+      if (!probe) return;
+      gradeProbe(db, today, grade);
+      log.write({ type: 'probe_graded', book: probe.book, chapter: probe.chapter });
+    },
+    [db, today, log, probe],
+  );
+
   if (session.loading) return null;
 
   return (
@@ -258,6 +293,14 @@ export function Flow({ services }: FlowProps) {
             getVerseText={getVerseText}
             onGrade={handleGradeRecall}
             onSkip={handleSkipRecall}
+          />
+        )}
+        {probe && (
+          <ProbeZone
+            book={probe.book}
+            chapter={probe.chapter}
+            getChapterText={getProbeChapterText}
+            onGrade={handleGradeProbe}
           />
         )}
         <ScriptureZone

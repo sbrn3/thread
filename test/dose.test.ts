@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { todaysTarget } from '../src/lab/dose';
+import { activeE10Arm, activeE10Target, todaysTarget } from '../src/lab/dose';
+import { meta } from '../src/log/log';
+import { migrate } from '../src/log/schema';
 import type { TextProvider, Verse } from '../src/text/provider';
 import { buildDailyPortion, splitSittings } from '../src/text/sittings';
 import { openTestDb } from './util/testDb';
@@ -75,9 +77,46 @@ describe('buildDailyPortion (§21.2 — "the dose is the unit; the chapter is no
   });
 });
 
-describe('todaysTarget (§16.5 resolution order — Phase 1 stub)', () => {
-  it('returns null (seed mode) until Phase 2 (E10) / Phase 4 (lapse ladder) exist', () => {
+describe('todaysTarget / E10 (§14, day 190+, never during E4)', () => {
+  it('is null before day 190 of the trial', () => {
     const db = openTestDb();
-    expect(todaysTarget(db, '2026-07-14')).toBeNull();
+    migrate(db);
+    meta.set(db, 'trial_start', '2026-01-01');
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    expect(todaysTarget(db, '2026-06-01')).toBeNull(); // well under 190 days in
+  });
+
+  it('picks a target from {10,20,30,45} once day 190 arrives', () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_start', '2026-01-01');
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const date = '2026-07-10'; // > 190 days after 2026-01-01
+    const arm = activeE10Arm(db, date);
+    expect(arm).not.toBeNull();
+    expect([10, 20, 30, 45]).toContain(activeE10Target(db, date));
+  });
+
+  it('never activates while E4 is active — a fixed target is meaningless against its "any verse counts" arm', () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_start', '2026-01-01');
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const date = '2026-07-10';
+    db.run(
+      `INSERT INTO exp_phases (exp_id, phase, arm, start_date, end_date, status) VALUES ('E4', 1, 'B', ?, ?, 'active')`,
+      [date, date],
+    );
+    expect(activeE10Target(db, date)).toBeNull();
+    expect(todaysTarget(db, date)).toBeNull();
+  });
+
+  it('is deterministic — the same (trialSeed, date) always resolves to the same arm', () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_start', '2026-01-01');
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const date = '2026-07-10';
+    expect(activeE10Arm(db, date)).toBe(activeE10Arm(db, date));
   });
 });

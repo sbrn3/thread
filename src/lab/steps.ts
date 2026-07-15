@@ -1,3 +1,4 @@
+import { activeE10Arm } from './dose';
 import { deriveDayRow, meta } from '../log/log';
 import { addDays, datesBetween } from '../log/time';
 import type { ReconcileContext, ReconcileSteps } from './reconcile';
@@ -139,6 +140,21 @@ export function diagnose(ctx: ReconcileContext, date: string): void {
        VALUES (?, ?, 'post_miss_morning', ?, 0, 1)`,
       [Date.now(), date, arm],
     );
+  }
+
+  // E10: recorded once daily, here — never from live session code
+  // (which recomputes the same deterministic arm purely, with no
+  // write, to size today's actual reading — see dose.ts).
+  const e10Arm = activeE10Arm(ctx.db, date);
+  if (e10Arm) {
+    const already = ctx.db.get(`SELECT 1 FROM decisions WHERE local_date = ? AND point = 'dose_target'`, [date]);
+    if (!already) {
+      ctx.db.run(
+        `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
+         VALUES (?, ?, 'dose_target', ?, 0, 1)`,
+        [Date.now(), date, e10Arm],
+      );
+    }
   }
 }
 

@@ -10,6 +10,29 @@ import { meta } from '../log/log';
 import { addDays, logicalToday } from '../log/time';
 import { planSyncWindow } from './schedule';
 
+/**
+ * §14 E7 arm B ("5 days/week, any 5") — changes what counts as a
+ * miss, not what the reading flow looks like. A day inside an active
+ * E7-arm-B phase needs no nudge if the trailing 7 days already have 5
+ * sealed — the week's quota is already met, so pinging today would be
+ * pressure the experiment's arm is specifically testing the absence
+ * of. Only ever relaxes the seed/arm-A behaviour, never tightens it.
+ */
+function e7ArmBPhase(db: SqlDb, date: string): { start_date: string; end_date: string } | null {
+  const phase = db.get<{ arm: string; start_date: string; end_date: string }>(
+    `SELECT arm, start_date, end_date FROM exp_phases WHERE exp_id = 'E7' AND status = 'active'`,
+  );
+  return phase && phase.arm === 'B' && date >= phase.start_date && date <= phase.end_date
+    ? phase
+    : null;
+}
+
+function weeklyQuotaMet(sealedDatesSorted: readonly string[], date: string): boolean {
+  const windowStart = addDays(date, -7);
+  const count = sealedDatesSorted.filter((d) => d >= windowStart && d < date).length;
+  return count >= 5;
+}
+
 // Minimal surface of expo-notifications this module needs — injectable
 // so tests can supply a fake instead of touching the real native module.
 export interface NotificationsLike {
@@ -80,12 +103,16 @@ export class Notifier {
         .all<{ local_date: string }>("SELECT local_date FROM decisions WHERE point = 'nudge_hour'")
         .map((r) => r.local_date),
     );
-    const sealedDays = new Set(
-      this.db.all<{ local_date: string }>('SELECT local_date FROM days WHERE sealed = 1').map((r) => r.local_date),
+    const sealedDatesSorted = this.db
+      .all<{ local_date: string }>('SELECT local_date FROM days WHERE sealed = 1 ORDER BY local_date')
+      .map((r) => r.local_date);
+    const quotaMetDays = next30Days.filter(
+      (d) => e7ArmBPhase(this.db, d) !== null && weeklyQuotaMet(sealedDatesSorted, d),
     );
+    const noNudgeNeeded = new Set([...sealedDatesSorted, ...quotaMetDays]);
 
     const trialSeed = meta.get(this.db, 'trial_seed') ?? 'thread-default-seed';
-    const plan = planSyncWindow({ next30Days, alreadyScheduled, sealedDays });
+    const plan = planSyncWindow({ next30Days, alreadyScheduled, sealedDays: noNudgeNeeded });
 
     for (const { date } of plan) {
       const arm = weightedPick(trialSeed, `E5:${date}`, NUDGE_WEIGHTS);
