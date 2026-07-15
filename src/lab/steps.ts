@@ -1,12 +1,17 @@
 import { activeE10Arm } from './dose';
-import { deriveDayRow, meta } from '../log/log';
+import { ladder, type Signature } from './ladder';
+import { setProfile } from './profile';
+import { buildSignatureContext, classifySignature } from './signature';
+import { computeStreak, deriveDayRow, meta } from '../log/log';
 import { addDays, datesBetween } from '../log/time';
+import type { Dose } from '../log/types';
 import type { ReconcileContext, ReconcileSteps } from './reconcile';
 import { hasConfound } from './confound';
 import { weightedPick } from './mrt';
 import { PHASES_PER_EXPERIMENT, PHASE_DAYS, phaseArm } from './phases';
 import { REVERSAL_QUEUE, type ReversalExpId } from './registry';
-import type { Signature } from './ladder';
+
+const DOSE_RUNGS: Dose[] = ['full_chapter', 'half_sitting', 'single_passage', 'one_verse'];
 
 /**
  * 1. Derive the days row for this date from its events, then flag
@@ -101,14 +106,24 @@ export function advancePhase(ctx: ReconcileContext, date: string): void {
 
 /**
  * 4. Signature → dose ladder → response (§11), plus the E6 post-miss
- * MRT decision point ("the morning after any unsealed day", §10):
- * randomized once per lapse-start, independent of the reversal queue.
- * Only gapDays/ladderDay and the day-30 dormancy threshold are
- * well-enough specified to compute for real right now. Classifying
- * *why* a lapse is happening (cue_collapse vs dose_too_high vs
- * book_fatigue vs...) requires correlating signals not yet built
- * (W11) — 'drift' is written as the honest placeholder cause, not a
- * guess at the real one.
+ * MRT decision point and the E10 decision record.
+ *
+ * Signature is classified once, the morning a lapse starts (ladder_day
+ * transitions to 1), and carried forward unchanged for the rest of
+ * that lapse — recomputing it daily against an increasingly empty
+ * trailing window would let the diagnosis silently drift as the gap
+ * grows, which isn't what "why is this happening" is supposed to mean.
+ *
+ * The dose ladder steps down exactly once per lapse (the first day
+ * reduce_dose applies, ladder_day===2) and back up exactly once a
+ * fresh 7-day seal streak completes — silent, reversible, and it's
+ * the mechanism that makes todaysTarget() (dose.ts) actually vary
+ * during a real lapse, not just from an applied E10 result.
+ *
+ * The day-30 dormancy threshold in the plan's prose and ladder.ts's
+ * own tested tiers disagree (ladder() calls it dormant past day 14,
+ * not 30) — conformed to ladder.ts here, since that's the side with
+ * real, already-passing tests establishing its exact boundaries.
  */
 export function diagnose(ctx: ReconcileContext, date: string): void {
   const lastSealed = ctx.db.get<{ local_date: string }>(
@@ -117,17 +132,49 @@ export function diagnose(ctx: ReconcileContext, date: string): void {
   );
   const ladderDay = lastSealed ? datesBetween(lastSealed.local_date, date).length : 0;
 
-  const signature: Signature = 'drift';
+  let signature: Signature;
+  if (ladderDay === 0) {
+    signature = 'drift'; // not lapsing — the value is moot
+  } else if (ladderDay === 1) {
+    signature = classifySignature(buildSignatureContext(ctx.db, date));
+    // §11 mechanic-friction override — automatic, not a question:
+    // "Seal reverts to tap immediately, without waiting for E1."
+    // Applied the moment this signature is diagnosed, silently.
+    if (signature === 'mechanic_friction') setProfile(ctx.db, 'seal', 'tap');
+  } else {
+    const yesterday = ctx.db.get<{ signature: Signature }>('SELECT signature FROM state WHERE local_date = ?', [
+      addDays(date, -1),
+    ]);
+    signature = yesterday?.signature ?? 'drift';
+  }
+
+  // Dose ladder stepping — before reading `dose` below, so today's
+  // state row and todaysTarget() both see the post-step value.
+  if (ladderDay === 2) {
+    const current = (meta.get(ctx.db, 'dose') ?? 'full_chapter') as Dose;
+    const idx = DOSE_RUNGS.indexOf(current);
+    if (idx < DOSE_RUNGS.length - 1) meta.set(ctx.db, 'dose', DOSE_RUNGS[idx + 1]);
+  }
+  if (ladderDay === 0 && computeStreak(ctx.db, date) === 7) {
+    const current = (meta.get(ctx.db, 'dose') ?? 'full_chapter') as Dose;
+    const idx = DOSE_RUNGS.indexOf(current);
+    if (idx > 0) meta.set(ctx.db, 'dose', DOSE_RUNGS[idx - 1]);
+  }
+
   const dose = meta.get(ctx.db, 'dose') ?? 'full_chapter';
-  const dormant = ladderDay > 30 ? 1 : 0;
+  const dormant = ladderDay > 14 ? 1 : 0;
+
+  const hasPartner = !!ctx.db.get('SELECT 1 FROM partner WHERE id = 1');
+  const response = ladderDay > 0 ? ladder(ladderDay, signature, hasPartner) : null;
 
   ctx.db.run(
-    `INSERT INTO state (local_date, signature, dose, ladder_day, dormant)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO state (local_date, signature, dose, ladder_day, dormant, ladder_action, ladder_payload, ladder_responded)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)
      ON CONFLICT(local_date) DO UPDATE SET
        signature = excluded.signature, dose = excluded.dose,
-       ladder_day = excluded.ladder_day, dormant = excluded.dormant`,
-    [date, signature, dose, ladderDay, dormant],
+       ladder_day = excluded.ladder_day, dormant = excluded.dormant,
+       ladder_action = excluded.ladder_action, ladder_payload = excluded.ladder_payload`,
+    [date, signature, dose, ladderDay, dormant, response?.action ?? null, response ? JSON.stringify(response) : null],
   );
 
   // E6: exactly the morning a lapse starts (ladder_day transitions to

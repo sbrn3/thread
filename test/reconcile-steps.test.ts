@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getProfile } from '../src/lab/profile';
 import { Log, meta } from '../src/log/log';
 import { migrate } from '../src/log/schema';
 import type { ReconcileContext } from '../src/lab/reconcile';
@@ -210,7 +211,7 @@ describe('diagnose (§13.4 reconcile step 4)', () => {
     expect(row?.dormant).toBe(0);
   });
 
-  it('flags dormant past 30 days since the last seal (§11)', () => {
+  it('flags dormant past day 14 since the last seal — conformed to ladder()\'s own tested tiers, not the plan prose\'s day 30', () => {
     const ctx = setup();
     ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-06-01', 1, 'full_chapter')`);
 
@@ -218,6 +219,77 @@ describe('diagnose (§13.4 reconcile step 4)', () => {
 
     const row = ctx.db.get<{ dormant: number }>("SELECT dormant FROM state WHERE local_date = '2026-07-14'");
     expect(row?.dormant).toBe(1);
+  });
+
+  it('dormancy boundary is exactly day 14/15, matching ladder()\'s offramp/dormant tiers', () => {
+    const ctx14 = setup();
+    ctx14.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-01', 1, 'full_chapter')`);
+    diagnose(ctx14, '2026-07-15'); // 14 days later
+    expect(ctx14.db.get<{ dormant: number }>("SELECT dormant FROM state WHERE local_date = '2026-07-15'")?.dormant).toBe(0);
+
+    const ctx15 = setup();
+    ctx15.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-01', 1, 'full_chapter')`);
+    diagnose(ctx15, '2026-07-16'); // 15 days later
+    expect(ctx15.db.get<{ dormant: number }>("SELECT dormant FROM state WHERE local_date = '2026-07-16'")?.dormant).toBe(1);
+  });
+
+  it('classifies a real signature the morning a lapse starts, and carries it forward unchanged for the rest of the lapse', () => {
+    const ctx = setup();
+    // hold_cancel-heavy window ⇒ mechanic_friction (also auto-applies profile.seal='tap').
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-01', 1, 'full_chapter')`);
+    for (let i = 0; i < 5; i++) {
+      ctx.db.run(`INSERT INTO events (ts, tz_offset, local_date, type, build_sha) VALUES (0, 0, '2026-06-25', 'hold_cancel', 't')`);
+    }
+    ctx.db.run(`INSERT INTO events (ts, tz_offset, local_date, type, build_sha) VALUES (0, 0, '2026-06-25', 'seal', 't')`);
+
+    diagnose(ctx, '2026-07-02'); // ladder_day = 1 — classifies fresh
+    diagnose(ctx, '2026-07-03'); // ladder_day = 2 — carries forward
+
+    const day1 = ctx.db.get<{ signature: string }>("SELECT signature FROM state WHERE local_date = '2026-07-02'");
+    const day2 = ctx.db.get<{ signature: string }>("SELECT signature FROM state WHERE local_date = '2026-07-03'");
+    expect(day1?.signature).toBe('mechanic_friction');
+    expect(day2?.signature).toBe('mechanic_friction'); // carried forward, not recomputed
+    expect(getProfile(ctx.db, 'seal')).toBe('tap'); // §11 — automatic, no question asked
+  });
+
+  it('dose ladder steps down once at ladder_day=2, and back up once a fresh 7-day streak completes', () => {
+    const ctx = setup();
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-01', 1, 'full_chapter')`);
+
+    diagnose(ctx, '2026-07-02'); // ladder_day = 1 — no step yet
+    expect(meta.get(ctx.db, 'dose')).toBeNull();
+    diagnose(ctx, '2026-07-03'); // ladder_day = 2 — steps down once
+    expect(meta.get(ctx.db, 'dose')).toBe('half_sitting');
+    diagnose(ctx, '2026-07-04'); // ladder_day = 3 — does not step again
+    expect(meta.get(ctx.db, 'dose')).toBe('half_sitting');
+
+    // A fresh 7-day seal streak, immediately after, steps it back up once.
+    let d = new Date('2026-07-04T00:00:00Z');
+    for (let i = 0; i < 7; i++) {
+      d = new Date(d.getTime() + 86_400_000);
+      const iso = d.toISOString().slice(0, 10);
+      ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES (?, 1, 'full_chapter')`, [iso]);
+      diagnose(ctx, iso);
+    }
+    expect(meta.get(ctx.db, 'dose')).toBe('full_chapter');
+  });
+
+  it('records a real ladder_action/ladder_payload for a lapsing day, null for a healthy one', () => {
+    const ctx = setup();
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-01', 1, 'full_chapter')`);
+
+    diagnose(ctx, '2026-07-01'); // healthy day (ladder_day=0)
+    const healthy = ctx.db.get<{ ladder_action: string | null }>(
+      "SELECT ladder_action FROM state WHERE local_date = '2026-07-01'",
+    );
+    expect(healthy?.ladder_action).toBeNull();
+
+    diagnose(ctx, '2026-07-06'); // ladder_day = 5 — one_question tier
+    const lapsing = ctx.db.get<{ ladder_action: string; ladder_payload: string }>(
+      "SELECT ladder_action, ladder_payload FROM state WHERE local_date = '2026-07-06'",
+    );
+    expect(lapsing?.ladder_action).toBe('one_question');
+    expect(JSON.parse(lapsing!.ladder_payload)).toMatchObject({ action: 'one_question' });
   });
 
   it('carries the current dose from meta, defaulting to full_chapter', () => {

@@ -209,8 +209,17 @@ const V7: string[] = [
   )`,
 ];
 
+// v8 — §11 the lapse ladder, made real: the actual LadderResponse for
+// the day (action + its payload, e.g. which offramp options were
+// available), so the UI can show it and know not to re-show it.
+const V8: string[] = [
+  `ALTER TABLE state ADD COLUMN ladder_action TEXT`,
+  `ALTER TABLE state ADD COLUMN ladder_payload TEXT`,
+  `ALTER TABLE state ADD COLUMN ladder_responded INTEGER DEFAULT 0`,
+];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7, V8];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

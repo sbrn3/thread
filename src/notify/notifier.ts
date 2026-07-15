@@ -97,6 +97,7 @@ export class Notifier {
    */
   async syncWindow(cue: Cue, today: string = logicalToday()): Promise<void> {
     if (cue.nudgeHour === null) return;
+    if (meta.get(this.db, 'paused') === '1') return; // §11 offramp — "pause," chosen from the lapse ladder's offer
     if ((await this.permission()) !== 'granted') return;
 
     const next30Days = Array.from({ length: 30 }, (_, i) => addDays(today, i + 1));
@@ -132,17 +133,39 @@ export class Notifier {
         continue;
       }
 
-      await this.notifications.scheduleNotificationAsync({
+      const scheduled = await this.scheduleNudgeOnce(date, {
         identifier: identifierFor(date),
         content: copyFor(arm, cue),
         trigger: dateTrigger(date, cue.nudgeHour),
       });
-      this.db.run(
-        `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
-         VALUES (?, ?, 'nudge_hour', ?, 0, 0)`,
-        [Date.now(), date, arm],
-      );
+      if (scheduled) {
+        this.db.run(
+          `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
+           VALUES (?, ?, 'nudge_hour', ?, 0, 0)`,
+          [Date.now(), date, arm],
+        );
+      }
     }
+  }
+
+  /**
+   * §09 "at most once per day. Ever. No escalation..." — the
+   * one-nudge ceiling, as an un-bypassable wrapper (§12/W12): this is
+   * the only place in the app that actually calls the native
+   * scheduling API, and it re-checks freshly here rather than
+   * trusting every caller to have already excluded the date, so a
+   * future decision point can never accidentally schedule a second
+   * nudge the same day no matter how it gets wired in. Returns
+   * whether it actually scheduled.
+   */
+  private async scheduleNudgeOnce(
+    date: string,
+    request: ExpoNotifications.NotificationRequestInput,
+  ): Promise<boolean> {
+    const alreadyPending = this.db.get('SELECT 1 FROM decisions WHERE local_date = ? AND delivered = 0', [date]);
+    if (alreadyPending) return false;
+    await this.notifications.scheduleNotificationAsync(request);
+    return true;
   }
 
   /**

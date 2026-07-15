@@ -6,7 +6,9 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
 } from 'react-native-reanimated';
+import type { Cue } from '../cue';
 import { getPendingReport, markApplied, type PendingReport } from '../lab/analysis/report';
+import { getPendingLadderResponse, markLadderResponded, type PendingLapseResponse } from '../lab/lapse';
 import { gradeProbe, resolveTodaysProbe, type DailyProbe, type ProbeGrade } from '../lab/probe';
 import { getProfile } from '../lab/profile';
 import { computeStreak, meta } from '../log/log';
@@ -17,6 +19,7 @@ import type { Grade, Passage } from '../log/types';
 import { DAILY_RECALL_CAP } from '../memory/leitner';
 import { bundledChapterCount } from '../text';
 import { ArrivalZone } from './ArrivalZone';
+import { LapseZone } from './LapseZone';
 import { ProbeZone } from './ProbeZone';
 import { RecallZone } from './RecallZone';
 import { ScriptureZone } from './ScriptureZone';
@@ -34,7 +37,7 @@ interface FlowProps {
 // is also reachable any time via the knot (W5), independent of
 // today's seal.
 export function Flow({ services }: FlowProps) {
-  const { db, log, text, memory, notifier } = services;
+  const { db, log, text, memory, notifier, partner } = services;
   const session = useSession();
   const reducedMotion = useReducedMotion();
 
@@ -95,6 +98,57 @@ export function Flow({ services }: FlowProps) {
     },
     [db],
   );
+
+  // §11/§12 — the lapse ladder's user-facing tiers. Ungated by
+  // sealedToday, unlike a report: this exists precisely because today
+  // may not get sealed.
+  const [pendingLapse, setPendingLapse] = useState<PendingLapseResponse | null>(null);
+  const [partnerName, setPartnerName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (session.loading) return;
+    setPendingLapse(getPendingLadderResponse(db, today));
+  }, [session.loading, db, today]);
+
+  useEffect(() => {
+    void partner.get().then((p) => setPartnerName(p?.name ?? null));
+  }, [partner]);
+
+  const handleSaveCue = useCallback(
+    (c: Cue) => {
+      services.cue.set(c);
+    },
+    [services.cue],
+  );
+
+  const handleExitBook = useCallback(
+    (bookId: string) => {
+      meta.set(db, 'current_book', bookId);
+      meta.set(db, 'current_chapter', '1');
+      meta.set(db, 'current_sitting', '0');
+      meta.set(db, 'book_started_local_date', today);
+      log.write({ type: 'book_start', book: bookId, chapter: 1 });
+      void session.load(db, log, text, today);
+    },
+    [db, log, text, today, session],
+  );
+
+  const handlePause = useCallback(() => {
+    meta.set(db, 'paused', '1');
+  }, [db]);
+
+  const handleKeepNudging = useCallback(() => {
+    // No state change — nudging continues exactly as it was.
+  }, []);
+
+  const handleHandoff = useCallback(() => {
+    void partner.openConversation();
+  }, [partner]);
+
+  const handleDismissLapse = useCallback(() => {
+    markLadderResponded(db, today);
+    setPendingLapse(null);
+  }, [db, today]);
 
   useEffect(() => {
     if (session.loading) return;
@@ -309,6 +363,20 @@ export function Flow({ services }: FlowProps) {
           sittingsTotal={session.sittings.length}
           daysInBook={session.daysInBook}
         />
+        {pendingLapse && (
+          <LapseZone
+            response={pendingLapse.response}
+            partnerName={partnerName}
+            cue={services.cue.current()}
+            currentBookId={session.book}
+            onSaveCue={handleSaveCue}
+            onExitBook={handleExitBook}
+            onPause={handlePause}
+            onKeepNudging={handleKeepNudging}
+            onHandoff={handleHandoff}
+            onDismiss={handleDismissLapse}
+          />
+        )}
         {dueToday.length > 0 && (
           <RecallZone
             passages={dueToday}

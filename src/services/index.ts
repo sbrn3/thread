@@ -10,6 +10,8 @@ import { Log, meta } from '../log/log';
 import { migrate } from '../log/schema';
 import { Memory } from '../memory/memory';
 import { Notifier } from '../notify';
+import { PartnerService } from '../partner';
+import { nativePartnerIo } from '../partner/nativeIo';
 import { createTextProvider, type TextProvider } from '../text';
 
 export interface Services {
@@ -20,6 +22,7 @@ export interface Services {
   memory: Memory;
   notifier: Notifier;
   backup: Backup;
+  partner: PartnerService;
 }
 
 /** Opens the one SQLite connection the app uses for its whole lifetime, migrated to latest. */
@@ -47,5 +50,6 @@ export function createServices(db: SqlDb): Services {
   const memory = new Memory(db, log);
   const notifier = new Notifier(db, ExpoNotifications);
   const backup = new Backup(db, expoCrypto, nativeBackupIo);
-  return { db, log, text, cue, memory, notifier, backup };
+  const partner = new PartnerService(db, log, nativePartnerIo);
+  return { db, log, text, cue, memory, notifier, backup, partner };
 }

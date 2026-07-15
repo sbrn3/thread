@@ -247,4 +247,41 @@ describe('Notifier (§13.3 /src/notify, §08, §10 E5 arm selection)', () => {
     );
     expect(row?.delivered).toBe(1); // untouched — voiding this would bias the MRT estimate toward silence
   });
+
+  it('§11 offramp "pause": syncWindow no-ops entirely while meta.paused=1', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    meta.set(db, 'paused', '1');
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, '2026-07-14');
+
+    expect(db.all('SELECT * FROM decisions')).toHaveLength(0);
+    expect(fake.scheduled.size).toBe(0);
+  });
+
+  it('§09/§12 one-nudge ceiling: never schedules a real notification for a date that already has any pending decision', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const today = '2026-07-14';
+    // A pending (delivered=0) decision from an unrelated point, on the
+    // very first date syncWindow would otherwise plan for.
+    db.run(
+      `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered) VALUES (0, '2026-07-15', 'dose_target', 'v20', 0, 0)`,
+    );
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
+
+    // The ceiling blocks the actual OS call for that date — no nudge_hour
+    // row gets written for it, since scheduleNudgeOnce() only writes one
+    // once scheduling actually happened.
+    const blockedDateRow = db.get("SELECT 1 FROM decisions WHERE local_date = '2026-07-15' AND point = 'nudge_hour'");
+    expect(blockedDateRow).toBeUndefined();
+    expect([...fake.scheduled.keys()].some((id) => id.includes('2026-07-15'))).toBe(false);
+  });
 });

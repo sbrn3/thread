@@ -4,7 +4,7 @@ import type { Cue } from '../cue';
 import { WeaveZone } from '../flow/WeaveZone';
 import { ScriptureZone } from '../flow/ScriptureZone';
 import { getProfile } from '../lab/profile';
-import { computeStreak } from '../log/log';
+import { computeStreak, meta } from '../log/log';
 import { logicalToday } from '../log/time';
 import type { Services } from '../services';
 import { bookName } from '../text/canon';
@@ -13,6 +13,7 @@ import { tokens } from '../ui/tokens';
 import { BackupSection } from './BackupSection';
 import { ChapterStrip, type ChapterEntry } from './ChapterStrip';
 import { CueEditor } from './CueEditor';
+import { PartnerSection } from './PartnerSection';
 
 interface KnotProps {
   services: Services;
@@ -25,12 +26,13 @@ interface KnotProps {
  * read, and the cue editor. The only concession to non-linear use.
  */
 export function Knot({ services }: KnotProps) {
-  const { db, log, text, cue, backup } = services;
+  const { db, log, text, cue, backup, partner } = services;
   const today = useRef(logicalToday()).current;
 
   const [open, setOpen] = useState(false);
   const [cueState, setCueState] = useState<Cue | null>(() => cue.current());
   const [viewing, setViewing] = useState<{ entry: ChapterEntry; verses: Verse[] } | null>(null);
+  const [paused, setPaused] = useState(() => meta.get(db, 'paused') === '1');
 
   const monthGrid = useMemo(() => {
     if (!open) return { sealedDays: new Set<number>(), daysInMonth: 31 };
@@ -76,6 +78,11 @@ export function Knot({ services }: KnotProps) {
     setOpen(true);
   };
 
+  const handleResume = () => {
+    meta.set(db, 'paused', '0');
+    setPaused(false);
+  };
+
   return (
     <>
       <Pressable
@@ -94,6 +101,15 @@ export function Knot({ services }: KnotProps) {
               <Text style={styles.close}>Close</Text>
             </Pressable>
             <ScrollView contentContainerStyle={styles.sheetContent}>
+              {paused && (
+                <View style={styles.pausedBanner}>
+                  <Text style={styles.pausedText}>Notifications are paused.</Text>
+                  <Pressable onPress={handleResume}>
+                    <Text style={styles.resumeLabel}>Resume</Text>
+                  </Pressable>
+                </View>
+              )}
+
               <Text style={styles.sectionLabel}>The weave</Text>
               <WeaveZone
                 monthLabel={new Date(`${today}T12:00:00Z`).toLocaleDateString(undefined, {
@@ -111,6 +127,9 @@ export function Knot({ services }: KnotProps) {
 
               <Text style={styles.sectionLabel}>The cue</Text>
               <CueEditor cue={cueState} onSave={handleCueSave} />
+
+              <Text style={styles.sectionLabel}>Partner</Text>
+              <PartnerSection partner={partner} />
 
               <Text style={styles.sectionLabel}>Backup</Text>
               <BackupSection backup={backup} />
@@ -182,6 +201,26 @@ const styles = StyleSheet.create({
     fontFamily: tokens.font.mono,
     fontSize: 13,
     color: tokens.color.ink40,
+  },
+  pausedBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: tokens.color.ink15,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  pausedText: {
+    fontFamily: tokens.font.mono,
+    fontSize: 12,
+    color: tokens.color.ink60,
+  },
+  resumeLabel: {
+    fontFamily: tokens.font.display,
+    fontWeight: '700',
+    fontSize: 13,
+    color: tokens.color.thread,
   },
   sectionLabel: {
     fontFamily: tokens.font.mono,
