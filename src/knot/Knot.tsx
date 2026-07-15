@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { Cue } from '../cue';
 import { WeaveZone } from '../flow/WeaveZone';
 import { ScriptureZone } from '../flow/ScriptureZone';
@@ -95,12 +95,15 @@ export function Knot({ services }: KnotProps) {
       </Pressable>
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
-        <View style={styles.backdrop}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.sheet}>
             <Pressable style={styles.closeRow} onPress={() => setOpen(false)}>
               <Text style={styles.close}>Close</Text>
             </Pressable>
-            <ScrollView contentContainerStyle={styles.sheetContent}>
+            <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
               {paused && (
                 <View style={styles.pausedBanner}>
                   <Text style={styles.pausedText}>Notifications are paused.</Text>
@@ -135,7 +138,7 @@ export function Knot({ services }: KnotProps) {
               <BackupSection backup={backup} />
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={viewing !== null} animationType="slide" onRequestClose={() => setViewing(null)}>

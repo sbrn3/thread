@@ -55,13 +55,12 @@ export function LapseZone({
         <View style={styles.zone}>
           <Text style={styles.prompt}>{ONE_QUESTION_COPY.cue_collapse}</Text>
           {renegotiatingCue ? (
-            <CueEditor
-              cue={cue}
-              onSave={(c) => {
-                onSaveCue(c);
-                onDismiss();
-              }}
-            />
+            <View style={styles.pickerBlock}>
+              <CueEditor cue={cue} onSave={onSaveCue} />
+              <Pressable style={styles.primaryBtn} onPress={onDismiss}>
+                <Text style={styles.primaryBtnLabel}>Done</Text>
+              </Pressable>
+            </View>
           ) : (
             <View style={styles.row}>
               <Pressable style={styles.primaryBtn} onPress={() => setRenegotiatingCue(true)}>
@@ -83,15 +82,17 @@ export function LapseZone({
           {pickingBook !== null ? (
             <View style={styles.pickerBlock}>
               <BookPicker excludeId={currentBookId} selected={pickingBook} onSelect={setPickingBook} />
-              <Pressable
-                style={styles.primaryBtn}
-                onPress={() => {
-                  onExitBook(pickingBook);
-                  onDismiss();
-                }}
-              >
-                <Text style={styles.primaryBtnLabel}>Switch now</Text>
-              </Pressable>
+              {pickingBook && (
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => {
+                    onExitBook(pickingBook);
+                    onDismiss();
+                  }}
+                >
+                  <Text style={styles.primaryBtnLabel}>Switch now</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             <View style={styles.row}>
@@ -140,7 +141,7 @@ export function LapseZone({
           >
             <Text style={styles.secondaryBtnLabel}>Keep nudging</Text>
           </Pressable>
-          {response.options.includes('handoff') && (
+          {response.options.includes('handoff') && partnerName && (
             <Pressable
               style={styles.secondaryBtn}
               onPress={() => {
@@ -167,7 +168,7 @@ export function LapseZone({
           : ''}
       </Text>
       <View style={styles.row}>
-        {response.farewell === 'handoff' && (
+        {response.farewell === 'handoff' && partnerName && (
           <Pressable style={styles.secondaryBtn} onPress={onHandoff}>
             <Text style={styles.secondaryBtnLabel}>Talk to {partnerName}</Text>
           </Pressable>

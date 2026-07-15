@@ -67,9 +67,18 @@ describe('PartnerService (§12 — the hand-off, local-only)', () => {
     await partner.openConversation();
 
     expect(io.openedUrls).toHaveLength(1);
-    expect(io.openedUrls[0]).toBe('sms:%2B15551234567');
+    expect(io.openedUrls[0]).toBe('sms:+15551234567'); // a literal +, not percent-encoded — see index.ts
     expect(io.openedUrls[0]).not.toMatch(/body=|\?/); // no prefilled body — nothing to encode as a message param
     expect(db.all("SELECT type FROM events")).toEqual([{ type: 'handoff_tapped' }]);
+  });
+
+  it('openConversation() strips formatting characters from a free-text contact entry', async () => {
+    const { io, partner } = setup();
+    await partner.set({ name: 'Sam', contactRef: '+1 (555) 123-4567', convoAnchor: 'x', convoDay: 0 });
+
+    await partner.openConversation();
+
+    expect(io.openedUrls[0]).toBe('sms:+15551234567');
   });
 
   it('openConversation() does nothing when no partner is set', async () => {

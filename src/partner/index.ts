@@ -83,7 +83,13 @@ export class PartnerService implements Partner {
   async openConversation(): Promise<void> {
     const partner = await this.get();
     if (!partner) return;
-    await this.io.openURL(`sms:${encodeURIComponent(partner.contactRef)}`);
+    // Not percent-encoded: some Android SMS handlers don't decode
+    // %2B back into `+` for this scheme, so a plain leading + and
+    // digits (stripping whatever formatting the free-text contact
+    // field was entered with — spaces, dashes, parens) is safer than
+    // a technically-correct but less broadly-compatible encoding.
+    const number = partner.contactRef.trim().replace(/[^\d+]/g, '');
+    await this.io.openURL(`sms:${number}`);
     this.log.write({ type: 'handoff_tapped' });
   }
 
