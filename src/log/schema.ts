@@ -196,8 +196,21 @@ const V6: string[] = [
   )`,
 ];
 
+// v7 — §15 "the engine can be overruled," made concrete: a small
+// applied-settings profile (seal mode, streak visibility, completion
+// floor, ...), written the moment a report is Applied, read by the
+// components each experiment actually governs. Separate from `meta`
+// (free-form bookkeeping) because these are read on every relevant
+// render and deserve a clear, dedicated name.
+const V7: string[] = [
+  `CREATE TABLE IF NOT EXISTS profile (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  )`,
+];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

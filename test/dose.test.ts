@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { activeE10Arm, activeE10Target, todaysTarget } from '../src/lab/dose';
+import { setProfile } from '../src/lab/profile';
 import { meta } from '../src/log/log';
 import { migrate } from '../src/log/schema';
 import type { TextProvider, Verse } from '../src/text/provider';
@@ -118,5 +119,16 @@ describe('todaysTarget / E10 (§14, day 190+, never during E4)', () => {
     meta.set(db, 'trial_seed', 'fixed-seed');
     const date = '2026-07-10';
     expect(activeE10Arm(db, date)).toBe(activeE10Arm(db, date));
+  });
+
+  it('an applied profile.doseTarget overrides the live E10 randomization entirely (§15)', () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_start', '2026-01-01');
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    setProfile(db, 'doseTarget', '28');
+
+    expect(todaysTarget(db, '2026-01-05')).toBe(28); // well before day 190 — still applies
+    expect(todaysTarget(db, '2026-07-10')).toBe(28); // and after, regardless of the E10 roll
   });
 });

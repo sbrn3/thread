@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Log, meta } from '../src/log/log';
+import { computeStreak, Log, meta } from '../src/log/log';
 import { migrate } from '../src/log/schema';
 import { logicalDate } from '../src/log/time';
 import type { AppEvent } from '../src/log/types';
@@ -63,5 +63,30 @@ describe('Log.write (W1)', () => {
     meta.set(db, 'watermark', '2026-07-14');
     meta.set(db, 'watermark', '2026-07-15');
     expect(meta.get(db, 'watermark')).toBe('2026-07-15');
+  });
+});
+
+describe('computeStreak (§14 E3, applied)', () => {
+  it('counts consecutive sealed days ending at today', () => {
+    const { db } = setup();
+    for (const d of ['2026-07-11', '2026-07-12', '2026-07-13', '2026-07-14']) {
+      db.run(`INSERT INTO days (local_date, sealed, dose) VALUES (?, 1, 'full_chapter')`, [d]);
+    }
+    expect(computeStreak(db, '2026-07-14')).toBe(4);
+  });
+
+  it('stops at the first gap', () => {
+    const { db } = setup();
+    db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-10', 1, 'full_chapter')`); // gap before this
+    for (const d of ['2026-07-12', '2026-07-13', '2026-07-14']) {
+      db.run(`INSERT INTO days (local_date, sealed, dose) VALUES (?, 1, 'full_chapter')`, [d]);
+    }
+    expect(computeStreak(db, '2026-07-14')).toBe(3);
+  });
+
+  it('is 0 if today itself was not sealed', () => {
+    const { db } = setup();
+    db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-13', 1, 'full_chapter')`);
+    expect(computeStreak(db, '2026-07-14')).toBe(0);
   });
 });

@@ -1,4 +1,5 @@
 import type { SqlDb } from '../../log/db';
+import { setProfile } from '../profile';
 import { PHASE_DAYS, PHASES_PER_EXPERIMENT } from '../phases';
 import { REVERSAL_QUEUE } from '../registry';
 import { analyzeReversal } from './reversal';
@@ -37,6 +38,39 @@ const RECOMMENDATION_TEMPLATES: Record<string, { A: string; B: string }> = {
 function recommendationFor(r: ReversalReport): string {
   if (!r.winner) return 'No change — the two conditions performed about the same.';
   return RECOMMENDATION_TEMPLATES[r.expId]?.[r.winner] ?? `Adopt arm ${r.winner} for ${r.expId}.`;
+}
+
+/**
+ * §15's compiled decision-rule profile, applied immediately per
+ * experiment rather than deferred to a single day-357 ceremony (a
+ * deliberate simplification for a solo, still-early trial — see
+ * profile.ts). Each entry maps a winning arm to the setting the
+ * component it actually governs reads.
+ */
+const PROFILE_EFFECTS: Record<string, (winner: 'A' | 'B') => { key: string; value: string }> = {
+  E1: (w) => ({ key: 'seal', value: w === 'B' ? 'tap' : 'hold' }),
+  E3: (w) => ({ key: 'streakVisible', value: w === 'A' ? '1' : '0' }),
+  E4: (w) => ({ key: 'floor', value: w === 'B' ? 'one_verse' : 'full_chapter' }),
+  E7: (w) => ({ key: 'frequencyTarget', value: w === 'B' ? '5_per_week' : 'daily' }),
+};
+
+/**
+ * Reads the already-generated verdict straight from `reports` — no
+ * need to re-run analysis just to apply its conclusion. A no-op for
+ * 'none' (no winner to adopt) or an expId with no governed setting
+ * (E9/E10 — MRT reports aren't surfaced yet, so this is never called
+ * for them today, but the mapping costs nothing to have ready).
+ */
+export function applyRecommendation(db: SqlDb, expId: string): void {
+  const row = db.get<{ verdict: string }>('SELECT verdict FROM reports WHERE exp_id = ?', [expId]);
+  const winner = row?.verdict;
+  if (winner !== 'A' && winner !== 'B') return;
+
+  const effect = PROFILE_EFFECTS[expId];
+  if (!effect) return;
+
+  const { key, value } = effect(winner);
+  setProfile(db, key, value);
 }
 
 function titleCase(s: string): string {
@@ -94,10 +128,13 @@ export function saveReversalReport(db: SqlDb, r: ReversalReport, recommendation:
 
 /**
  * §15 "the engine can be overruled": logs the user's response and
- * never re-asks. Advises; does not govern.
+ * never re-asks — and, when Applied (not merely Kept), immediately
+ * writes the winning arm into the profile so the component it governs
+ * actually changes.
  */
 export function markApplied(db: SqlDb, expId: string, applied: boolean): void {
   db.run('UPDATE reports SET applied = ? WHERE exp_id = ?', [applied ? 1 : 0, expId]);
+  if (applied) applyRecommendation(db, expId);
 }
 
 export interface PendingReport {

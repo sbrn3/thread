@@ -3,6 +3,8 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import type { Cue } from '../cue';
 import { WeaveZone } from '../flow/WeaveZone';
 import { ScriptureZone } from '../flow/ScriptureZone';
+import { getProfile } from '../lab/profile';
+import { computeStreak } from '../log/log';
 import { logicalToday } from '../log/time';
 import type { Services } from '../services';
 import { bookName } from '../text/canon';
@@ -101,6 +103,7 @@ export function Knot({ services }: KnotProps) {
                 daysInMonth={monthGrid.daysInMonth}
                 sealedDays={monthGrid.sealedDays}
                 todayDay={Number(today.slice(8, 10))}
+                streak={getProfile(db, 'streakVisible') === '1' ? computeStreak(db, today) : null}
               />
 
               <Text style={styles.sectionLabel}>Chapters read</Text>

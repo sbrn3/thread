@@ -28,6 +28,10 @@ interface SealZoneProps {
   onSeal: () => void;
   onHoldCancel: () => void;
   onScrollLock: (locked: boolean) => void;
+  /** §14 E1, applied: 'tap' renders the fallback button unconditionally, independent of accessibility state. Defaults to 'hold'. */
+  sealMode?: 'hold' | 'tap';
+  /** §14 E4, applied — the completion floor: whether today's reading has met the bar to seal yet. Defaults to true (no gate) when omitted. */
+  canSeal?: boolean;
 }
 
 /**
@@ -45,7 +49,15 @@ interface SealZoneProps {
  * active (or under reduced motion, where the ring wouldn't animate
  * anyway) this renders a plain button that seals immediately instead.
  */
-export function SealZone({ sealed, reducedMotion, onSeal, onHoldCancel, onScrollLock }: SealZoneProps) {
+export function SealZone({
+  sealed,
+  reducedMotion,
+  onSeal,
+  onHoldCancel,
+  onScrollLock,
+  sealMode = 'hold',
+  canSeal = true,
+}: SealZoneProps) {
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const ringProgress = useSharedValue(0);
   const pulseTick = useSharedValue(0);
@@ -67,6 +79,7 @@ export function SealZone({ sealed, reducedMotion, onSeal, onHoldCancel, onScroll
   const hold = Gesture.LongPress()
     .minDuration(tokens.seal.holdMs)
     .maxDistance(tokens.seal.maxDriftPx)
+    .enabled(canSeal)
     .onBegin(() => {
       runOnJS(onScrollLock)(true);
       ringProgress.value = withTiming(1, { duration: tokens.seal.holdMs, easing: Easing.linear });
@@ -107,14 +120,20 @@ export function SealZone({ sealed, reducedMotion, onSeal, onHoldCancel, onScroll
     );
   }
 
-  if (screenReaderEnabled || reducedMotion) {
+  if (sealMode === 'tap' || screenReaderEnabled || reducedMotion) {
     return (
       <View style={styles.zone}>
         <Pressable
           onPress={onSeal}
-          style={({ pressed }) => [styles.ringFallback, pressed && styles.ringPressed]}
+          disabled={!canSeal}
+          style={({ pressed }) => [
+            styles.ringFallback,
+            pressed && canSeal && styles.ringPressed,
+            !canSeal && styles.disabled,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Seal today's reading"
+          accessibilityState={{ disabled: !canSeal }}
         >
           <Text style={styles.ringLabel}>Seal</Text>
         </Pressable>
@@ -123,7 +142,7 @@ export function SealZone({ sealed, reducedMotion, onSeal, onHoldCancel, onScroll
   }
 
   return (
-    <View style={styles.zone}>
+    <View style={[styles.zone, !canSeal && styles.disabled]}>
       <GestureDetector gesture={composed}>
         <View style={styles.ringWrap} accessible={false}>
           <Svg width={(RADIUS + STROKE) * 2} height={(RADIUS + STROKE) * 2}>
@@ -185,6 +204,9 @@ const styles = StyleSheet.create({
   },
   ringPressed: {
     borderColor: tokens.color.thread,
+  },
+  disabled: {
+    opacity: 0.4,
   },
   ringLabel: {
     fontFamily: tokens.font.display,

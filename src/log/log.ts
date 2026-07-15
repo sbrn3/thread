@@ -1,6 +1,6 @@
 import type { SqlDb, SqlParam } from './db';
 import type { AppEvent, Day, EventInput } from './types';
-import { logicalDate, tzOffsetMinutes } from './time';
+import { addDays, logicalDate, tzOffsetMinutes } from './time';
 
 export interface LogDeps {
   db: SqlDb;
@@ -121,6 +121,26 @@ export function deriveDayRow(db: SqlDb, log: Log, date: string): void {
       seal?.build_sha ?? null,
     ],
   );
+}
+
+/**
+ * §14 E3 (applied, 'visible' arm only) — consecutive sealed days
+ * ending at `today`. `today` itself must already be sealed for this
+ * to return non-zero (callers only ever ask once the day is sealed).
+ */
+export function computeStreak(db: SqlDb, today: string): number {
+  const sealedDates = new Set(
+    db
+      .all<{ local_date: string }>('SELECT local_date FROM days WHERE sealed = 1 AND local_date <= ?', [today])
+      .map((r) => r.local_date),
+  );
+  let streak = 0;
+  let cursor = today;
+  while (sealedDates.has(cursor)) {
+    streak += 1;
+    cursor = addDays(cursor, -1);
+  }
+  return streak;
 }
 
 // meta helpers — watermark, trial seed, dose, dormancy (§13.2)

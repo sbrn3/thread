@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { setProfile } from '../src/lab/profile';
 import { meta } from '../src/log/log';
 import { migrate } from '../src/log/schema';
 import type { NotificationsLike } from '../src/notify/notifier';
@@ -151,6 +152,24 @@ describe('Notifier (§13.3 /src/notify, §08, §10 E5 arm selection)', () => {
 
     const tomorrowRow = db.get("SELECT 1 FROM decisions WHERE local_date = '2026-07-15' AND point = 'nudge_hour'");
     expect(tomorrowRow).toBeUndefined(); // quota already met — no nudge needed
+  });
+
+  it('E7 applied ("5_per_week"): the quota relaxation persists past the experiment\'s own phase window', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    setProfile(db, 'frequencyTarget', '5_per_week'); // as if E7 already concluded and was Applied — no active exp_phases row at all
+    const today = '2026-07-14';
+    for (const d of ['2026-07-08', '2026-07-09', '2026-07-10', '2026-07-11', '2026-07-12']) {
+      db.run(`INSERT INTO days (local_date, sealed, dose) VALUES (?, 1, 'full_chapter')`, [d]);
+    }
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
+
+    const tomorrowRow = db.get("SELECT 1 FROM decisions WHERE local_date = '2026-07-15' AND point = 'nudge_hour'");
+    expect(tomorrowRow).toBeUndefined();
   });
 
   it('E7 arm A (or no active E7 phase): the weekly quota never suppresses a nudge', async () => {

@@ -8,7 +8,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { getPendingReport, markApplied, type PendingReport } from '../lab/analysis/report';
 import { gradeProbe, resolveTodaysProbe, type DailyProbe, type ProbeGrade } from '../lab/probe';
-import { meta } from '../log/log';
+import { getProfile } from '../lab/profile';
+import { computeStreak, meta } from '../log/log';
 import type { Services } from '../services';
 import { useSession } from '../state/session';
 import { logicalToday } from '../log/time';
@@ -105,9 +106,18 @@ export function Flow({ services }: FlowProps) {
     if (currentCue) void notifier.syncWindow(currentCue, today);
   }, [session.loading, notifier, services.cue, today]);
 
+  // §14 E4, applied — the completion floor. 'one_verse' only requires
+  // reading to have started; the default 'full_chapter' requires
+  // having scrolled to the bottom. Mirrors the worklet-side
+  // readingStartFired/scrollEndFired shared values into plain React
+  // state so SealZone (a JS-thread component) can read them.
+  const [hasStartedReading, setHasStartedReading] = useState(false);
+  const [hasReachedEnd, setHasReachedEnd] = useState(false);
+
   const logReadingStart = useCallback(() => {
     if (readingStartLogged.current) return;
     readingStartLogged.current = true;
+    setHasStartedReading(true);
     log.write({ type: 'reading_start', book: session.book, chapter: session.chapter, sitting: session.sittingIndex });
   }, [log, session.book, session.chapter, session.sittingIndex]);
 
@@ -115,6 +125,7 @@ export function Flow({ services }: FlowProps) {
     (scrollPct: number) => {
       if (scrollEndLogged.current) return;
       scrollEndLogged.current = true;
+      setHasReachedEnd(true);
       log.write({
         type: 'scroll_end',
         book: session.book,
@@ -152,6 +163,8 @@ export function Flow({ services }: FlowProps) {
       scrollEndLogged.current = false;
       readingStartFired.value = false;
       scrollEndFired.value = false;
+      setHasStartedReading(false);
+      setHasReachedEnd(false);
       void notifier.cancelToday(today); // §08 — sealing silences the phone for the rest of the day
       refreshMonthGrid();
     });
@@ -238,7 +251,8 @@ export function Flow({ services }: FlowProps) {
   useEffect(() => {
     if (session.loading) return;
     const trialSeed = meta.get(db, 'trial_seed') ?? 'thread-default-seed';
-    const todaysProbe = resolveTodaysProbe(db, today, trialSeed);
+    const probeRate = Number(getProfile(db, 'probeRate') ?? '0.6'); // §14 E9, applied
+    const todaysProbe = resolveTodaysProbe(db, today, trialSeed, probeRate);
     setProbe(todaysProbe);
     if (todaysProbe && !probeFiredLogged.current) {
       probeFiredLogged.current = true;
@@ -262,6 +276,14 @@ export function Flow({ services }: FlowProps) {
   );
 
   if (session.loading) return null;
+
+  // §14, applied settings — read fresh each render (a plain SQLite
+  // read, same pattern as services.cue.current() below) so a report
+  // Applied moments ago takes effect on the very next render.
+  const sealMode = getProfile(db, 'seal') === 'tap' ? 'tap' : 'hold';
+  const floor = getProfile(db, 'floor') === 'one_verse' ? 'one_verse' : 'full_chapter';
+  const canSeal = floor === 'one_verse' ? hasStartedReading : hasReachedEnd;
+  const streak = getProfile(db, 'streakVisible') === '1' && session.sealedToday ? computeStreak(db, today) : null;
 
   return (
     <View style={styles.container} onLayout={(e) => (layoutHeight.value = e.nativeEvent.layout.height)}>
@@ -318,6 +340,8 @@ export function Flow({ services }: FlowProps) {
           onSeal={handleSeal}
           onHoldCancel={handleHoldCancel}
           onScrollLock={(locked) => setScrollEnabled(!locked)}
+          sealMode={sealMode}
+          canSeal={canSeal}
         />
         {session.sealedToday && (
           <>
@@ -329,6 +353,7 @@ export function Flow({ services }: FlowProps) {
               daysInMonth={monthGrid.daysInMonth}
               sealedDays={monthGrid.sealedDays}
               todayDay={Number(today.slice(8, 10))}
+              streak={streak}
             />
             <DismissalZone
               book={session.book}
