@@ -16,10 +16,10 @@ function fakeText(): TextProvider {
   };
 }
 
-function setup() {
+function setup(now: () => number = () => Date.parse('2026-07-14T12:00:00Z')) {
   const db = openTestDb();
   migrate(db);
-  const log = new Log({ db, buildSha: 'test-sha' });
+  const log = new Log({ db, buildSha: 'test-sha', now });
   const text = fakeText();
   return { db, log, text };
 }
@@ -31,6 +31,7 @@ beforeEach(() => {
     chapter: 1,
     sittingIndex: 0,
     sittings: [],
+    portionChapters: [],
     sealedToday: false,
     attribution: null,
     daysInBook: 1,
@@ -142,5 +143,24 @@ describe('session store — book selection (§05 onboarding-set, defensive fallb
 
     expect(meta.get(db, 'current_book')).toBe('hebrews'); // canon order after Philemon
     expect(useSession.getState().nextBookNeeded).toBe(true); // still needs a real pick going forward
+  });
+});
+
+describe('session store — verse-normalized dose (§07, Phase 1)', () => {
+  it('seal() logs the sitting\'s verse count, and deriveDayRow carries it onto the days row', async () => {
+    const { db, log, text } = setup(); // fakeText's chapters are 1 verse each
+    meta.set(db, 'current_book', 'genesis');
+    meta.set(db, 'current_chapter', '1');
+    meta.set(db, 'current_sitting', '0');
+    meta.set(db, 'book_started_local_date', '2026-07-14');
+
+    await useSession.getState().load(db, log, text, '2026-07-14');
+    await useSession.getState().seal(db, log, text, '2026-07-14');
+
+    const day = db.get<{ verses_read: number; target_verses: number | null }>(
+      "SELECT verses_read, target_verses FROM days WHERE local_date = '2026-07-14'",
+    );
+    expect(day?.verses_read).toBe(1); // fakeText's chapters are exactly 1 verse
+    expect(day?.target_verses).toBeNull(); // seed mode — todaysTarget() is null until Phase 2/4
   });
 });

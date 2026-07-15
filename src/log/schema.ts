@@ -176,8 +176,28 @@ const V4: string[] = [
 // show a report without recomputing analysis just to redisplay it.
 const V5: string[] = [`ALTER TABLE reports ADD COLUMN report_text TEXT`];
 
+// v6 — verse-normalized dose model (§07/§14/§16.5). `dose` (the
+// full_chapter|half_sitting|single_passage|one_verse enum) is
+// untouched — these are new, additive columns alongside it. Chapters
+// vary 20x (Psalm 117 = 2 verses; Psalm 119 = 176), so "one chapter"
+// is not a dose; verses are the physical unit everything internal
+// measures against. `probes` backs E9 (the next-day recall probe).
+const V6: string[] = [
+  `ALTER TABLE events ADD COLUMN verses_count INTEGER`,
+  `ALTER TABLE events ADD COLUMN target_verses INTEGER`,
+  `ALTER TABLE days ADD COLUMN verses_read INTEGER`,
+  `ALTER TABLE days ADD COLUMN target_verses INTEGER`,
+  `CREATE TABLE IF NOT EXISTS probes (
+    local_date TEXT PRIMARY KEY,
+    fired INTEGER,
+    book TEXT, chapter INTEGER,
+    verses_read INTEGER,
+    grade TEXT
+  )`,
+];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

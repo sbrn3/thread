@@ -37,6 +37,8 @@ export interface AppEvent {
   before_nudge: number | null; // 1 = read before backup notif fired
   exp_id: string | null; // active experiment, e.g. 'E1'
   exp_arm: string | null; // 'A' | 'B'
+  verses_count: number | null; // §07 — the physical dose of a seal event. Verses, never chapters.
+  target_verses: number | null; // §07 — that day's target, if a fixed one was active (E10/ladder); null in seed mode
   build_sha: string; // stamped by the writer
 }
 
@@ -53,6 +55,8 @@ export type EventInput = { type: EventType } & Partial<
     | 'before_nudge'
     | 'exp_id'
     | 'exp_arm'
+    | 'verses_count'
+    | 'target_verses'
   >
 >;
 
@@ -66,6 +70,8 @@ export interface Day {
   chapter: number | null;
   sitting: number | null;
   dose: Dose;
+  verses_read: number | null;
+  target_verses: number | null;
   exp_id: string | null;
   exp_arm: string | null;
   disturbed: number;

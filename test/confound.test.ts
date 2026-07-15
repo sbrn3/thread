@@ -17,6 +17,8 @@ function event(type: AppEvent['type']): AppEvent {
     before_nudge: null,
     exp_id: null,
     exp_arm: null,
+    verses_count: null,
+    target_verses: null,
     build_sha: 'test',
   };
 }

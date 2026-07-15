@@ -16,6 +16,7 @@ export const BACKUP_TABLES = [
   'srbai',
   'reports',
   'state',
+  'probes',
   'meta',
 ] as const;
 

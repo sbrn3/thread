@@ -28,8 +28,9 @@ export class Log {
     this.db.run(
       `INSERT INTO events
         (ts, tz_offset, local_date, type, book, chapter, sitting,
-         duration_ms, scroll_pct, before_nudge, exp_id, exp_arm, build_sha)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         duration_ms, scroll_pct, before_nudge, exp_id, exp_arm,
+         verses_count, target_verses, build_sha)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         ts,
         tzOffsetMinutes(ts),
@@ -43,6 +44,8 @@ export class Log {
         e.before_nudge ?? null,
         e.exp_id ?? null,
         e.exp_arm ?? null,
+        e.verses_count ?? null,
+        e.target_verses ?? null,
         this.buildSha,
       ] satisfies SqlParam[],
     );
@@ -91,14 +94,16 @@ export function deriveDayRow(db: SqlDb, log: Log, date: string): void {
   db.run(
     `INSERT INTO days
        (local_date, sealed, sealed_before_nudge, book, chapter, sitting,
-        dose, exp_id, exp_arm, disturbed, build_sha)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+        dose, verses_read, target_verses, exp_id, exp_arm, disturbed, build_sha)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
      ON CONFLICT(local_date) DO UPDATE SET
        sealed = excluded.sealed,
        sealed_before_nudge = excluded.sealed_before_nudge,
        book = excluded.book,
        chapter = excluded.chapter,
        sitting = excluded.sitting,
+       verses_read = excluded.verses_read,
+       target_verses = excluded.target_verses,
        exp_id = excluded.exp_id,
        exp_arm = excluded.exp_arm`,
     [
@@ -109,6 +114,8 @@ export function deriveDayRow(db: SqlDb, log: Log, date: string): void {
       reading?.chapter ?? null,
       reading?.sitting ?? null,
       'full_chapter',
+      seal?.verses_count ?? null,
+      seal?.target_verses ?? null,
       seal?.exp_id ?? null,
       seal?.exp_arm ?? null,
       seal?.build_sha ?? null,

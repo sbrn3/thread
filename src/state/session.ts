@@ -1,11 +1,12 @@
 import { create } from 'zustand';
+import { todaysTarget } from '../lab/dose';
 import { meta } from '../log/log';
 import type { Log } from '../log/log';
 import type { SqlDb } from '../log/db';
 import { CANON, nextBook } from '../text/canon';
 import { bundledChapterCount } from '../text';
-import type { TextProvider, Verse } from '../text/provider';
-import { splitSittings, type Sitting } from '../text/sittings';
+import type { TextProvider } from '../text/provider';
+import { buildDailyPortion, type Sitting } from '../text/sittings';
 
 // §04 — one book at a time. Onboarding (§05) requires picking both a
 // current book and a next one before it can complete, so by the time
@@ -19,6 +20,8 @@ export interface SessionState {
   chapter: number;
   sittingIndex: number;
   sittings: Sitting[];
+  /** WEB-canon chapter numbers merged into today's portion (§21.2) — length 1 unless a short chapter merged forward. */
+  portionChapters: number[];
   sealedToday: boolean;
   attribution: string | null;
   daysInBook: number;
@@ -37,9 +40,16 @@ function daysBetweenInclusive(from: string, to: string): number {
   return Math.round((b - a) / 86_400_000) + 1;
 }
 
-async function loadSittings(text: TextProvider, book: string, chapter: number): Promise<Sitting[]> {
-  const verses: Verse[] = await text.getChapter(book, chapter);
-  return splitSittings(verses);
+async function loadPortion(
+  db: SqlDb,
+  text: TextProvider,
+  book: string,
+  chapter: number,
+  today: string,
+): Promise<{ sittings: Sitting[]; chapters: number[] }> {
+  const target = todaysTarget(db, today);
+  const totalChapters = bundledChapterCount(book);
+  return buildDailyPortion(text, book, chapter, totalChapters, target);
 }
 
 export const useSession = create<SessionState>((set, get) => ({
@@ -48,6 +58,7 @@ export const useSession = create<SessionState>((set, get) => ({
   chapter: 1,
   sittingIndex: 0,
   sittings: [],
+  portionChapters: [],
   sealedToday: false,
   attribution: null,
   daysInBook: 1,
@@ -74,7 +85,7 @@ export const useSession = create<SessionState>((set, get) => ({
       log.write({ type: 'book_start', book, chapter });
     }
 
-    const sittings = await loadSittings(text, book, chapter);
+    const { sittings, chapters } = await loadPortion(db, text, book, chapter, today);
     const clampedIndex = Math.min(sittingIndex, sittings.length - 1);
 
     const days = log.daysBetween(today, today);
@@ -86,6 +97,7 @@ export const useSession = create<SessionState>((set, get) => ({
       chapter,
       sittingIndex: clampedIndex,
       sittings,
+      portionChapters: chapters,
       sealedToday,
       attribution: text.attribution(),
       daysInBook: daysBetweenInclusive(bookStarted ?? today, today),
@@ -95,7 +107,9 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   async seal(db, log, text, today) {
-    const { book, chapter, sittingIndex, sittings } = get();
+    const { book, chapter, sittingIndex, sittings, portionChapters } = get();
+    const versesInSitting = sittings[sittingIndex]?.length ?? 0;
+    const target = todaysTarget(db, today);
 
     log.write({
       type: 'seal',
@@ -103,6 +117,8 @@ export const useSession = create<SessionState>((set, get) => ({
       chapter,
       sitting: sittingIndex,
       before_nudge: 1, // no nudge system yet — always "before" until W6b
+      verses_count: versesInSitting,
+      ...(target !== null ? { target_verses: target } : {}),
     });
     log.rebuildDays(today);
 
@@ -116,11 +132,15 @@ export const useSession = create<SessionState>((set, get) => ({
       nextSittingIndex = sittingIndex + 1;
     } else {
       const totalChapters = bundledChapterCount(book);
-      if (chapter < totalChapters) {
-        nextChapter = chapter + 1;
+      // §21.2 — advance past every chapter merged into today's portion,
+      // not just the one it started on (a merge-forward day may have
+      // pulled in several short chapters at once).
+      const lastMergedChapter = portionChapters[portionChapters.length - 1] ?? chapter;
+      if (lastMergedChapter < totalChapters) {
+        nextChapter = lastMergedChapter + 1;
         nextSittingIndex = 0;
       } else {
-        log.write({ type: 'book_finish', book, chapter });
+        log.write({ type: 'book_finish', book, chapter: lastMergedChapter });
         finishedBook = book;
         // §05 onboarding queues the next book one deep; consume it
         // here. Canon order is only a defensive fallback for the
