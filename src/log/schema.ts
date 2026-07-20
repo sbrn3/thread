@@ -236,8 +236,20 @@ const V10: string[] = [
   )`,
 ];
 
+// v11 — §18 adaptive layer (dormant until day 366): which context
+// bucket a decision belonged to, so change-point detection can later
+// compare a bucket's recent vs. long-run reward rate. Additive;
+// existing decision rows just have bucket=NULL (pre-adaptive era).
+// bandit_updated tracks whether a decision's reward has already been
+// folded into its posterior — reconcile() must stay idempotent, and
+// without this a replay would double-count the same observation.
+const V11: string[] = [
+  `ALTER TABLE decisions ADD COLUMN bucket TEXT`,
+  `ALTER TABLE decisions ADD COLUMN bandit_updated INTEGER DEFAULT 0`,
+];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

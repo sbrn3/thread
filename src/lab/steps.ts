@@ -1,3 +1,4 @@
+import { type BanditBucket, isAdaptiveActive, updateBanditPosterior } from './bandit';
 import { activeE10Arm } from './dose';
 import { ladder, type Signature } from './ladder';
 import { setProfile } from './profile';
@@ -212,9 +213,26 @@ export function diagnose(ctx: ReconcileContext, date: string): void {
   }
 }
 
-/** 5. W12: dormant until day 366 (§13.5) — no bandit posteriors exist yet to update. Intentionally a no-op. */
-export function updateBandit(_ctx: ReconcileContext, _date: string): void {
-  // ships dormant — see §13.5 W12
+/**
+ * 5. §18 adaptive layer — ships dormant, a correct no-op before day
+ * 366 (isAdaptiveActive gates it). Once active, folds each nudge_hour
+ * decision's reward into its (arm, bucket) posterior exactly once —
+ * bandit_updated tracks that, so a reconcile() replay never double-
+ * counts the same observation into the posterior.
+ */
+export function updateBandit(ctx: ReconcileContext, date: string): void {
+  if (!isAdaptiveActive(ctx.db, date)) return;
+
+  const rows = ctx.db.all<{ id: number; arm: string; bucket: string; reward: number }>(
+    `SELECT id, arm, bucket, reward FROM decisions
+       WHERE point = 'nudge_hour' AND local_date = ? AND bucket IS NOT NULL
+         AND reward IS NOT NULL AND bandit_updated = 0`,
+    [date],
+  );
+  for (const row of rows) {
+    updateBanditPosterior(ctx.db, row.arm, row.bucket as BanditBucket, row.reward === 1, date);
+    ctx.db.run('UPDATE decisions SET bandit_updated = 1 WHERE id = ?', [row.id]);
+  }
 }
 
 /**
@@ -263,9 +281,19 @@ export function checkInvariants(ctx: ReconcileContext, date: string): void {
     );
   }
 
-  // 4. bandit α+β for a bucket only increases between reconciles —
-  // deferred to Phase 10/W13: there's no bandit updater yet to check
-  // against, so this would trivially pass against an empty table.
+  // 4. bandit posteriors never go below the uniform prior's floor.
+  // The plan's literal wording ("α+β only increases between
+  // reconciles") doesn't actually hold under its own update rule —
+  // change-point resets deliberately shrink a bucket back to (1,1),
+  // by design, whenever your life visibly changed. Checking a raw
+  // "always increases" would false-positive on every legitimate
+  // reset. What SHOULD never happen, reset or not, is decay/bump
+  // arithmetic producing an invalid posterior (alpha or beta < 1) —
+  // that's the actual bug class this guards against.
+  const invalidPosterior = ctx.db.get<{ c: number }>(
+    'SELECT COUNT(*) as c FROM bandit WHERE alpha < 1 OR beta < 1',
+  );
+  if ((invalidPosterior?.c ?? 0) > 0) violations.push(`a bandit posterior has alpha or beta below the prior floor`);
 
   // 5. every event's local_date matches what its own ts/tz_offset
   // re-derives, independent of the device's CURRENT timezone.

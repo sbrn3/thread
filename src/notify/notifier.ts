@@ -4,6 +4,7 @@
 // The real module is supplied at construction time (see services/index.ts).
 import type * as ExpoNotifications from 'expo-notifications';
 import type { Cue } from '../cue';
+import { chooseArm, computeContext, computeBucket, guardrailsSilence, isAdaptiveActive } from '../lab/bandit';
 import { weightedPick } from '../lab/mrt';
 import type { SqlDb } from '../log/db';
 import { meta } from '../log/log';
@@ -98,6 +99,7 @@ export class Notifier {
   async syncWindow(cue: Cue, today: string = logicalToday()): Promise<void> {
     if (cue.nudgeHour === null) return;
     if (meta.get(this.db, 'paused') === '1') return; // §11 offramp — "pause," chosen from the lapse ladder's offer
+    if (guardrailsSilence(this.db, today)) return; // §18 — dormancy or life_disruption vetoes the policy entirely
     if ((await this.permission()) !== 'granted') return;
 
     const next30Days = Array.from({ length: 30 }, (_, i) => addDays(today, i + 1));
@@ -117,8 +119,21 @@ export class Notifier {
     const trialSeed = meta.get(this.db, 'trial_seed') ?? 'thread-default-seed';
     const plan = planSyncWindow({ next30Days, alreadyScheduled, sealedDays: noNudgeNeeded });
 
+    // §18 — the bandit governs this moment once active. Bucket is
+    // computed once, from today's context (the same "whatever's true
+    // now" simplification this method already makes for the cue —
+    // see the doc comment on its call site in Flow.tsx), and applied
+    // across this whole planning batch.
+    const adaptive = isAdaptiveActive(this.db, today);
+    let bucket = null;
+    if (adaptive) {
+      const ctx = computeContext(this.db, today);
+      bucket = computeBucket(ctx.daysSinceRead, ctx.nudgeRecencyDays);
+    }
+
     for (const { date } of plan) {
-      const arm = weightedPick(trialSeed, `E5:${date}`, NUDGE_WEIGHTS);
+      const fallbackArm = weightedPick(trialSeed, `E5:${date}`, NUDGE_WEIGHTS);
+      const arm = adaptive && bucket ? chooseArm(this.db, trialSeed, date, bucket, fallbackArm) : fallbackArm;
 
       if (arm === 'silence') {
         // Nothing to schedule, and so nothing cancelToday() could ever
@@ -126,9 +141,9 @@ export class Notifier {
         // countable comparison point the moment it's assigned, not a
         // pending one waiting on an OS notification.
         this.db.run(
-          `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
-           VALUES (?, ?, 'nudge_hour', 'silence', 0, 1)`,
-          [Date.now(), date],
+          `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered, bucket)
+           VALUES (?, ?, 'nudge_hour', 'silence', 0, 1, ?)`,
+          [Date.now(), date, bucket],
         );
         continue;
       }
@@ -140,9 +155,9 @@ export class Notifier {
       });
       if (scheduled) {
         this.db.run(
-          `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered)
-           VALUES (?, ?, 'nudge_hour', ?, 0, 0)`,
-          [Date.now(), date, arm],
+          `INSERT INTO decisions (ts, local_date, point, arm, explored, delivered, bucket)
+           VALUES (?, ?, 'nudge_hour', ?, 0, 0, ?)`,
+          [Date.now(), date, arm, bucket],
         );
       }
     }

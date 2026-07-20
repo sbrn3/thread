@@ -12,6 +12,7 @@ import type { Services } from '../services';
 import { bookName } from '../text/canon';
 import type { Verse } from '../text/provider';
 import { tokens } from '../ui/tokens';
+import { AdaptiveSection } from './AdaptiveSection';
 import { BackupSection } from './BackupSection';
 import { ChapterStrip, type ChapterEntry } from './ChapterStrip';
 import { CueEditor } from './CueEditor';
@@ -139,6 +140,9 @@ export function Knot({ services }: KnotProps) {
 
               <Text style={styles.sectionLabel}>Backup</Text>
               <BackupSection backup={backup} />
+
+              <Text style={styles.sectionLabel}>Adaptive policy</Text>
+              <AdaptiveSection db={db} today={today} />
 
               <Text style={styles.sectionLabel}>Support</Text>
               <DiagnosticsSection diagnosticsText={buildDiagnostics(db)} amendments={getAmendmentLog(db)} />

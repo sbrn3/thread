@@ -284,4 +284,64 @@ describe('Notifier (§13.3 /src/notify, §08, §10 E5 arm selection)', () => {
     expect(blockedDateRow).toBeUndefined();
     expect([...fake.scheduled.keys()].some((id) => id.includes('2026-07-15'))).toBe(false);
   });
+
+  it('§18 guardrails: silences entirely during dormancy, even with a valid cue and permission', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const today = '2026-07-14';
+    db.run(`INSERT INTO state (local_date, dormant, signature) VALUES (?, 1, 'drift')`, [today]);
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
+
+    expect(db.all('SELECT * FROM decisions')).toHaveLength(0);
+    expect(fake.scheduled.size).toBe(0);
+  });
+
+  it('§18 guardrails: silences entirely during a life_disruption signature', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    const today = '2026-07-14';
+    db.run(`INSERT INTO state (local_date, dormant, signature) VALUES (?, 0, 'life_disruption')`, [today]);
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
+
+    expect(db.all('SELECT * FROM decisions')).toHaveLength(0);
+  });
+
+  it('§18 adaptive layer: before day 366, still uses the E5 weighted-pick fallback, never the bandit', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    meta.set(db, 'trial_start', '2026-07-01'); // only 13 days before "today"
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, '2026-07-14');
+
+    const rows = db.all<{ bucket: string | null }>("SELECT bucket FROM decisions WHERE point = 'nudge_hour'");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.bucket === null)).toBe(true); // no bucket tagged — the bandit never ran
+  });
+
+  it('§18 adaptive layer: once active (day 366+), tags every planned decision with today\'s bucket', async () => {
+    const db = openTestDb();
+    migrate(db);
+    meta.set(db, 'trial_seed', 'fixed-seed');
+    meta.set(db, 'trial_start', '2026-01-01');
+    const fake = fakeNotifications();
+    const notifier = new Notifier(db, fake);
+    const today = '2027-01-05'; // > 365 days after trial_start
+
+    await notifier.syncWindow({ anchor: 'coffee', place: 'chair', nudgeHour: 21, validated: true }, today);
+
+    const rows = db.all<{ bucket: string | null }>("SELECT bucket FROM decisions WHERE point = 'nudge_hour'");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.bucket !== null)).toBe(true);
+  });
 });

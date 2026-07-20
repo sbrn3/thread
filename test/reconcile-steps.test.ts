@@ -341,10 +341,56 @@ describe('diagnose (§13.4 reconcile step 4)', () => {
   });
 });
 
-describe('updateBandit (§13.5 W12 — ships dormant)', () => {
+describe('updateBandit (§13.5/§18 — ships dormant, activates day 366)', () => {
   it('is a no-op — nothing to update before day 366', () => {
     const ctx = setup();
     expect(() => updateBandit(ctx, '2026-07-14')).not.toThrow();
+    expect(ctx.db.all('SELECT * FROM bandit')).toHaveLength(0);
+  });
+
+  it('is still a no-op before day 366 even with a trial_start set', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'trial_start', '2026-07-01');
+    ctx.db.run(
+      `INSERT INTO decisions (local_date, point, arm, bucket, reward) VALUES ('2026-07-14', 'nudge_hour', 'neutral', 'steady_recent', 1)`,
+    );
+    updateBandit(ctx, '2026-07-14'); // ~13 days in
+    expect(ctx.db.all('SELECT * FROM bandit')).toHaveLength(0);
+  });
+
+  it('folds a bucketed, rewarded decision into its posterior once day 366 arrives, exactly once', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'trial_start', '2026-01-01');
+    const date = '2027-01-05'; // > 365 days after trial_start
+    ctx.db.run(
+      `INSERT INTO decisions (local_date, point, arm, bucket, reward) VALUES (?, 'nudge_hour', 'neutral', 'steady_recent', 1)`,
+      [date],
+    );
+
+    updateBandit(ctx, date);
+    const row = ctx.db.get<{ alpha: number; beta: number }>(
+      "SELECT alpha, beta FROM bandit WHERE arm = 'neutral' AND bucket = 'steady_recent'",
+    );
+    expect(row!.alpha).toBeGreaterThan(1);
+
+    // Re-running (reconcile's own idempotency requirement) must not
+    // fold the same decision in twice — bandit_updated guards this.
+    updateBandit(ctx, date);
+    const again = ctx.db.get<{ alpha: number }>(
+      "SELECT alpha FROM bandit WHERE arm = 'neutral' AND bucket = 'steady_recent'",
+    );
+    expect(again!.alpha).toBe(row!.alpha);
+  });
+
+  it('never touches a decision with no bucket (pre-adaptive era, or the E5/E10 fallback path)', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'trial_start', '2026-01-01');
+    const date = '2027-01-05';
+    ctx.db.run(
+      `INSERT INTO decisions (local_date, point, arm, bucket, reward) VALUES (?, 'nudge_hour', 'neutral', NULL, 1)`,
+      [date],
+    );
+    updateBandit(ctx, date);
     expect(ctx.db.all('SELECT * FROM bandit')).toHaveLength(0);
   });
 });
@@ -429,5 +475,27 @@ describe('checkInvariants (§13.4 reconcile step 6, §17 — flag, never auto-re
     checkInvariants(ctx, '2026-07-14');
 
     expect(meta.get(ctx.db, 'invariant_failed')).toMatch(/two active phases simultaneously/);
+  });
+
+  it('§19 invariant 4: flags a bandit posterior below the uniform prior floor', () => {
+    const ctx = setup();
+    ctx.db.run(
+      `INSERT INTO bandit (arm, bucket, alpha, beta, n_obs) VALUES ('neutral', 'steady_recent', 0.5, 1, 1)`,
+    );
+
+    checkInvariants(ctx, '2026-07-14');
+
+    expect(meta.get(ctx.db, 'invariant_failed')).toMatch(/bandit posterior.*below the prior floor/);
+  });
+
+  it('§19 invariant 4: a normal posterior at or above the floor is silent', () => {
+    const ctx = setup();
+    ctx.db.run(
+      `INSERT INTO bandit (arm, bucket, alpha, beta, n_obs) VALUES ('neutral', 'steady_recent', 3, 2, 2)`,
+    );
+
+    checkInvariants(ctx, '2026-07-14');
+
+    expect(meta.get(ctx.db, 'invariant_failed')).toBeNull();
   });
 });
