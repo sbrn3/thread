@@ -218,8 +218,13 @@ const V8: string[] = [
   `ALTER TABLE state ADD COLUMN ladder_responded INTEGER DEFAULT 0`,
 ];
 
+// v9 — §09/§19 monthly SRBAI + "formational line": one line of
+// reflection alongside the four automaticity questions already in
+// srbai (V1). Additive; q1-q4 untouched.
+const V9: string[] = [`ALTER TABLE srbai ADD COLUMN reflection TEXT`];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7, V8];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7, V8, V9];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');

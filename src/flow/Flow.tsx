@@ -11,6 +11,7 @@ import { getPendingReport, markApplied, type PendingReport } from '../lab/analys
 import { getPendingLadderResponse, markLadderResponded, type PendingLapseResponse } from '../lab/lapse';
 import { gradeProbe, resolveTodaysProbe, type DailyProbe, type ProbeGrade } from '../lab/probe';
 import { getProfile } from '../lab/profile';
+import { eyeballDates, isSrbaiDue, saveSrbai, type SrbaiAnswers } from '../lab/srbai';
 import { computeStreak, meta } from '../log/log';
 import type { Services } from '../services';
 import { useSession } from '../state/session';
@@ -24,6 +25,7 @@ import { ProbeZone } from './ProbeZone';
 import { RecallZone } from './RecallZone';
 import { ScriptureZone } from './ScriptureZone';
 import { SealZone } from './SealZone';
+import { SrbaiZone } from './SrbaiZone';
 import { WeaveZone } from './WeaveZone';
 import { DismissalZone } from './DismissalZone';
 import { ThreadRail } from './ThreadRail';
@@ -83,6 +85,19 @@ export function Flow({ services }: FlowProps) {
   useEffect(() => {
     if (session.sealedToday) setPendingReport(getPendingReport(db));
   }, [session.sealedToday, db]);
+
+  // §09/§19 — SRBAI + the monthly eyeball, once a month, after a seal.
+  const [srbaiDue, setSrbaiDue] = useState(false);
+  useEffect(() => {
+    if (session.sealedToday) setSrbaiDue(isSrbaiDue(db, today));
+  }, [session.sealedToday, db, today]);
+
+  const handleSaveSrbai = useCallback(
+    (answers: SrbaiAnswers) => {
+      saveSrbai(db, today, answers);
+    },
+    [db, today],
+  );
 
   const handleApplyReport = useCallback(
     (expId: string) => {
@@ -436,6 +451,7 @@ export function Flow({ services }: FlowProps) {
               onApplyReport={handleApplyReport}
               onKeepReport={handleKeepReport}
             />
+            {srbaiDue && <SrbaiZone eyeballDates={eyeballDates(db, today)} onSave={handleSaveSrbai} />}
           </>
         )}
       </Animated.ScrollView>
