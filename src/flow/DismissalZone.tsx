@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PendingReport } from '../lab/analysis/report';
+import type { PhaseMetric } from '../lab/analysis/reversal';
 import type { Passage } from '../log/types';
 import { bookName } from '../text/canon';
 import { BookPicker } from '../ui/BookPicker';
@@ -20,6 +21,8 @@ interface DismissalZoneProps {
   onPickNextBook: (bookId: string) => void;
   /** §15 — a completed experiment's report, not yet responded to. */
   pendingReport: PendingReport | null;
+  /** §10 W10 — the phase-by-phase chart alongside the pending report, if any. */
+  reportPhases: PhaseMetric[];
   onApplyReport: (expId: string) => void;
   onKeepReport: (expId: string) => void;
 }
@@ -46,6 +49,7 @@ export function DismissalZone({
   needsNextBookPick,
   onPickNextBook,
   pendingReport,
+  reportPhases,
   onApplyReport,
   onKeepReport,
 }: DismissalZoneProps) {
@@ -89,6 +93,7 @@ export function DismissalZone({
         <ReportPrompt
           recommendation={pendingReport.recommendation}
           reportText={pendingReport.reportText}
+          phases={reportPhases}
           onApply={() => onApplyReport(pendingReport.expId)}
           onKeep={() => onKeepReport(pendingReport.expId)}
         />

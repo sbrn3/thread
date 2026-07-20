@@ -52,8 +52,8 @@ export class Backup {
     return raw ? Number(raw) : null;
   }
 
-  /** Builds the dump, encrypts it if enabled, writes a shareable file, and opens the share sheet. Returns the file uri. */
-  async exportNow(now: () => number = Date.now): Promise<string> {
+  /** Builds the dump, encrypts it if enabled, and writes it to a shareable file. Returns the file uri — shared with nothing yet. */
+  private async writeEncryptedDump(now: () => number): Promise<string> {
     const dump = buildDump(this.db, now);
 
     let stored: StoredFile;
@@ -67,8 +67,34 @@ export class Backup {
     }
 
     const filename = `thread-backup-${new Date(now()).toISOString().slice(0, 10)}.json`;
-    const uri = await this.io.writeExportFile(filename, JSON.stringify(stored));
+    return this.io.writeExportFile(filename, JSON.stringify(stored));
+  }
+
+  /** The manual "Export now" path: writes the file and opens the OS share sheet. Returns the file uri. */
+  async exportNow(now: () => number = Date.now): Promise<string> {
+    const uri = await this.writeEncryptedDump(now);
     await this.io.shareFile(uri);
+    meta.set(this.db, META_LAST_EXPORT, String(now()));
+    return uri;
+  }
+
+  /**
+   * §19 "Weekly (auto): encrypted export. Silent unless it fails" —
+   * writes the file without opening the share sheet (there is no
+   * silent way to hand a file to another app on mobile; this is the
+   * closest honest equivalent — the file lands in the app's own
+   * document storage, retrievable without user interaction blocking
+   * app open). Returns null if a week hasn't passed since the last
+   * export yet; throws on failure so the caller can log it — the
+   * "unless it fails" half of that rule is the caller's job (see
+   * App.tsx), not this method's.
+   */
+  async autoExportIfDue(now: () => number = Date.now): Promise<string | null> {
+    const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const last = this.lastExportAt();
+    if (last !== null && now() - last < WEEK_MS) return null;
+
+    const uri = await this.writeEncryptedDump(now);
     meta.set(this.db, META_LAST_EXPORT, String(now()));
     return uri;
   }

@@ -229,4 +229,62 @@ describe('Backup (§16.9 export/restore orchestration)', () => {
   function db_seed(db: ReturnType<typeof openTestDb>, value: string) {
     db.run(`INSERT INTO meta (key, value) VALUES ('mark', ?)`, [value]);
   }
+
+  describe('autoExportIfDue (§19 "weekly (auto): encrypted export. Silent unless it fails")', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it('exports immediately when nothing has ever been exported, without opening the share sheet', async () => {
+      const db = openTestDb();
+      migrate(db);
+      const io = fakeIo();
+      const backup = new Backup(db, fakeCrypto(), io);
+
+      const uri = await backup.autoExportIfDue(() => 1_700_000_000_000);
+
+      expect(uri).not.toBeNull();
+      expect(io.shared).toEqual([]); // no share sheet — this is the silent path
+      expect(backup.lastExportAt()).toBe(1_700_000_000_000);
+    });
+
+    it('skips (returns null) when less than a week has passed', async () => {
+      const db = openTestDb();
+      migrate(db);
+      const io = fakeIo();
+      const backup = new Backup(db, fakeCrypto(), io);
+      const start = 1_700_000_000_000;
+      await backup.autoExportIfDue(() => start);
+
+      const result = await backup.autoExportIfDue(() => start + 3 * DAY);
+
+      expect(result).toBeNull();
+      expect(backup.lastExportAt()).toBe(start); // untouched
+    });
+
+    it('exports again once a full week has passed', async () => {
+      const db = openTestDb();
+      migrate(db);
+      const io = fakeIo();
+      const backup = new Backup(db, fakeCrypto(), io);
+      const start = 1_700_000_000_000;
+      await backup.autoExportIfDue(() => start);
+
+      const result = await backup.autoExportIfDue(() => start + 7 * DAY);
+
+      expect(result).not.toBeNull();
+      expect(backup.lastExportAt()).toBe(start + 7 * DAY);
+    });
+
+    it('throws (rather than swallowing) on failure, leaving lastExportAt untouched — the caller decides how to log it', async () => {
+      const db = openTestDb();
+      migrate(db);
+      const io = fakeIo();
+      io.writeExportFile = async () => {
+        throw new Error('disk full');
+      };
+      const backup = new Backup(db, fakeCrypto(), io);
+
+      await expect(backup.autoExportIfDue(() => 1_700_000_000_000)).rejects.toThrow('disk full');
+      expect(backup.lastExportAt()).toBeNull();
+    });
+  });
 });

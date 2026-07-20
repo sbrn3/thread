@@ -1,9 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { PhaseMetric } from '../lab/analysis/reversal';
+import { PHASE_DAYS } from '../lab/phases';
 import { tokens } from '../ui/tokens';
+import { PhaseChart } from './PhaseChart';
 
 interface ReportPromptProps {
   recommendation: string;
   reportText: string;
+  phases?: PhaseMetric[];
   onApply: () => void;
   onKeep: () => void;
 }
@@ -15,10 +19,11 @@ interface ReportPromptProps {
  * as is" is a legitimate answer, not a wrong one — the engine advises,
  * it does not govern.
  */
-export function ReportPrompt({ recommendation, reportText, onApply, onKeep }: ReportPromptProps) {
+export function ReportPrompt({ recommendation, reportText, phases, onApply, onKeep }: ReportPromptProps) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>A report is ready</Text>
+      {phases && phases.length > 0 && <PhaseChart phases={phases} totalDays={PHASE_DAYS} />}
       <Text style={styles.mono}>{reportText}</Text>
       <Text style={styles.recommendation}>{recommendation}</Text>
       <View style={styles.buttons}>

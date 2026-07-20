@@ -24,6 +24,20 @@ export function tzOffsetMinutes(ts: number): number {
   return -new Date(ts).getTimezoneOffset();
 }
 
+/**
+ * §19 invariant 5 — re-derives the logical date from a stored
+ * `ts`/`tz_offset` pair directly (no IANA zone lookup, no dependence
+ * on the device's CURRENT timezone), so a past event can be checked
+ * for internal consistency even if the device has since travelled.
+ * Mathematically the same operation logicalDate() does via
+ * formatInTimeZone — offset the instant, then read UTC calendar
+ * fields — just fed a raw offset instead of a zone name.
+ */
+export function logicalDateFromOffset(ts: number, tzOffsetMin: number): string {
+  const localMs = ts + tzOffsetMin * 60_000 - BOUNDARY_MS;
+  return new Date(localMs).toISOString().slice(0, 10);
+}
+
 /** Calendar dates after `fromExclusive` up to and including `toInclusive`. */
 export function datesBetween(fromExclusive: string, toInclusive: string): string[] {
   const out: string[] = [];

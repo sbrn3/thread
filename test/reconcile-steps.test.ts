@@ -116,6 +116,21 @@ describe('attributeRewards (§13.4 reconcile step 2)', () => {
     const row = ctx.db.get<{ reward: number }>("SELECT reward FROM decisions WHERE local_date = '2026-07-14'");
     expect(row?.reward).toBe(0);
   });
+
+  it('also fills reward for dose_target (E10) decisions — always delivered=1, so it fills immediately', () => {
+    const ctx = setup();
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-14', 1, 'full_chapter')`);
+    ctx.db.run(
+      `INSERT INTO decisions (local_date, point, arm, delivered) VALUES ('2026-07-14', 'dose_target', 'v20', 1)`,
+    );
+
+    attributeRewards(ctx, '2026-07-14');
+
+    const row = ctx.db.get<{ reward: number }>(
+      "SELECT reward FROM decisions WHERE local_date = '2026-07-14' AND point = 'dose_target'",
+    );
+    expect(row?.reward).toBe(1);
+  });
 });
 
 describe('advancePhase (§13.4 reconcile step 3, §13 "one reversal at a time")', () => {
@@ -365,5 +380,54 @@ describe('checkInvariants (§13.4 reconcile step 6, §17 — flag, never auto-re
     checkInvariants(ctx, date);
 
     expect(meta.get(ctx.db, 'invariant_failed')).toBeNull();
+  });
+
+  it('§19 invariant 1: flags a watermark regression', () => {
+    const ctx = setup();
+    meta.set(ctx.db, 'watermark', '2026-07-20');
+
+    checkInvariants(ctx, '2026-07-14'); // reconciling an earlier date than the watermark already reached
+
+    expect(meta.get(ctx.db, 'invariant_failed')).toMatch(/watermark regression/);
+  });
+
+  it('§19 invariant 3: flags a seal-event/sealed-day count mismatch', () => {
+    const ctx = setup();
+    // Two seal events on the same date, but only one days row derived —
+    // an over-count that deriveDayRow's single sealed=1 flag can't reflect.
+    ctx.db.run(`INSERT INTO events (ts, tz_offset, local_date, type, build_sha) VALUES (0, 0, '2026-07-14', 'seal', 't')`);
+    ctx.db.run(`INSERT INTO events (ts, tz_offset, local_date, type, build_sha) VALUES (0, 0, '2026-07-14', 'seal', 't')`);
+    ctx.db.run(`INSERT INTO days (local_date, sealed, dose) VALUES ('2026-07-14', 1, 'full_chapter')`);
+
+    checkInvariants(ctx, '2026-07-14');
+
+    expect(meta.get(ctx.db, 'invariant_failed')).toMatch(/seal event count.*!=.*sealed day count/);
+  });
+
+  it('§19 invariant 5: flags an event whose stored local_date disagrees with its own ts/tz_offset', () => {
+    const ctx = setup();
+    // ts for noon UTC on 2026-07-14, tz_offset=0 (UTC) → re-derives to
+    // 2026-07-14 (noon - 4h boundary is still the 14th) — but stored
+    // local_date claims a different day entirely.
+    const ts = Date.UTC(2026, 6, 14, 12, 0, 0);
+    ctx.db.run(`INSERT INTO events (ts, tz_offset, local_date, type, build_sha) VALUES (?, 0, '2026-07-20', 'app_open', 't')`, [ts]);
+
+    checkInvariants(ctx, '2026-07-20');
+
+    expect(meta.get(ctx.db, 'invariant_failed')).toMatch(/local_date 2026-07-20 != re-derived 2026-07-14/);
+  });
+
+  it('§19 invariant 6: flags two simultaneously-active phases for the same experiment', () => {
+    const ctx = setup();
+    ctx.db.run(
+      `INSERT INTO exp_phases (exp_id, phase, arm, start_date, end_date, status) VALUES ('E1', 0, 'A', '2026-06-01', '2026-06-21', 'active')`,
+    );
+    ctx.db.run(
+      `INSERT INTO exp_phases (exp_id, phase, arm, start_date, end_date, status) VALUES ('E1', 1, 'B', '2026-06-22', '2026-07-12', 'active')`,
+    );
+
+    checkInvariants(ctx, '2026-07-14');
+
+    expect(meta.get(ctx.db, 'invariant_failed')).toMatch(/two active phases simultaneously/);
   });
 });

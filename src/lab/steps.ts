@@ -3,7 +3,7 @@ import { ladder, type Signature } from './ladder';
 import { setProfile } from './profile';
 import { buildSignatureContext, classifySignature } from './signature';
 import { computeStreak, deriveDayRow, meta } from '../log/log';
-import { addDays, datesBetween } from '../log/time';
+import { addDays, datesBetween, logicalDateFromOffset } from '../log/time';
 import type { Dose } from '../log/types';
 import type { ReconcileContext, ReconcileSteps } from './reconcile';
 import { hasConfound } from './confound';
@@ -33,19 +33,26 @@ export function closeDay(ctx: ReconcileContext, date: string): void {
 }
 
 /**
- * 2. Fill decisions.reward for nudge_hour decisions on this date.
- * Proximal outcome: sealed that day. Only touches rows already marked
- * delivered=1 — and nothing sets that flag yet (it requires a live
- * notification-received listener, a device-level piece not built in
- * this pass). Correct now, genuinely inert until that listener exists;
- * not a stub, since the semantics are real and won't need revisiting.
+ * 2. Fill decisions.reward for this date's decisions. Proximal
+ * outcome: sealed that day — the same signal for every point that
+ * gets a per-day reward (nudge_hour AND dose_target/E10; the richer
+ * recall-weighted composite E10 actually needs for its curve fit is
+ * computed separately, at analysis time, from the raw days/probes
+ * tables — see analysis/dose.ts). nudge_hour is only ever filled for
+ * delivered=1 rows — and nothing sets that flag yet (it requires a
+ * live notification-received listener, a device-level piece not
+ * built in this pass). Correct now, genuinely inert until that
+ * listener exists; not a stub, since the semantics are real and won't
+ * need revisiting. dose_target rows are always delivered=1 (E10 is
+ * an assignment, not something that can fail to arrive), so those
+ * fill immediately.
  */
 export function attributeRewards(ctx: ReconcileContext, date: string): void {
   const day = ctx.db.get<{ sealed: number }>('SELECT sealed FROM days WHERE local_date = ?', [date]);
   const reward = day?.sealed ? 1 : 0;
   ctx.db.run(
     `UPDATE decisions SET reward = ?
-       WHERE local_date = ? AND point = 'nudge_hour' AND delivered = 1 AND reward IS NULL`,
+       WHERE local_date = ? AND point IN ('nudge_hour', 'dose_target') AND delivered = 1 AND reward IS NULL`,
     [reward, date],
   );
 }
@@ -218,6 +225,16 @@ export function updateBandit(_ctx: ReconcileContext, _date: string): void {
 export function checkInvariants(ctx: ReconcileContext, date: string): void {
   const violations: string[] = [];
 
+  // 1. watermark never regresses. Checked against the value as it
+  // stood before THIS iteration's own update — reconcile() sets it
+  // AFTER all 6 steps run, so it still holds the prior day here.
+  const watermark = meta.get(ctx.db, 'watermark');
+  if (watermark !== null && date <= watermark) {
+    violations.push(`watermark regression: reconciling ${date} but watermark is already ${watermark}`);
+  }
+
+  // 2. exactly one decision row per scheduled point per day, and a
+  // sealed day always has the seal event that should have produced it.
   const day = ctx.db.get<{ sealed: number }>('SELECT sealed FROM days WHERE local_date = ?', [date]);
   if (day?.sealed === 1) {
     const sealEvent = ctx.db.get('SELECT 1 FROM events WHERE local_date = ? AND type = ?', [date, 'seal']);
@@ -231,6 +248,45 @@ export function checkInvariants(ctx: ReconcileContext, date: string): void {
     [date],
   );
   if ((dupes?.c ?? 0) > 0) violations.push(`duplicate decision rows for ${date}`);
+
+  // 3. Σ(seal events) === Σ(days shown sealed in the weave) — a
+  // running total up to this date, not just today's own count.
+  const sealCounts = ctx.db.get<{ seal_events: number; sealed_days: number }>(
+    `SELECT
+       (SELECT COUNT(*) FROM events WHERE type = 'seal' AND local_date <= ?) as seal_events,
+       (SELECT COUNT(*) FROM days WHERE sealed = 1 AND local_date <= ?) as sealed_days`,
+    [date, date],
+  );
+  if (sealCounts && sealCounts.seal_events !== sealCounts.sealed_days) {
+    violations.push(
+      `seal event count (${sealCounts.seal_events}) != sealed day count (${sealCounts.sealed_days}) as of ${date}`,
+    );
+  }
+
+  // 4. bandit α+β for a bucket only increases between reconciles —
+  // deferred to Phase 10/W13: there's no bandit updater yet to check
+  // against, so this would trivially pass against an empty table.
+
+  // 5. every event's local_date matches what its own ts/tz_offset
+  // re-derives, independent of the device's CURRENT timezone.
+  const todaysEvents = ctx.db.all<{ id: number; ts: number; tz_offset: number; local_date: string }>(
+    'SELECT id, ts, tz_offset, local_date FROM events WHERE local_date = ?',
+    [date],
+  );
+  for (const e of todaysEvents) {
+    const recomputed = logicalDateFromOffset(e.ts, e.tz_offset);
+    if (recomputed !== e.local_date) {
+      violations.push(`event ${e.id}: stored local_date ${e.local_date} != re-derived ${recomputed}`);
+    }
+  }
+
+  // 6. no experiment has two arms active for the same exp_id.
+  const doubleActive = ctx.db.get<{ c: number }>(
+    `SELECT COUNT(*) as c FROM (
+       SELECT exp_id FROM exp_phases WHERE status = 'active' GROUP BY exp_id HAVING COUNT(*) > 1
+     )`,
+  );
+  if ((doubleActive?.c ?? 0) > 0) violations.push(`an experiment has two active phases simultaneously`);
 
   if (violations.length > 0) {
     const existing = meta.get(ctx.db, 'invariant_failed');

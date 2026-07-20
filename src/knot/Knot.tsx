@@ -3,6 +3,8 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleShee
 import type { Cue } from '../cue';
 import { WeaveZone } from '../flow/WeaveZone';
 import { ScriptureZone } from '../flow/ScriptureZone';
+import { getAmendmentLog } from '../lab/analysis/amendments';
+import { buildDiagnostics } from '../lab/diagnostics';
 import { getProfile } from '../lab/profile';
 import { computeStreak, meta } from '../log/log';
 import { logicalToday } from '../log/time';
@@ -13,6 +15,7 @@ import { tokens } from '../ui/tokens';
 import { BackupSection } from './BackupSection';
 import { ChapterStrip, type ChapterEntry } from './ChapterStrip';
 import { CueEditor } from './CueEditor';
+import { DiagnosticsSection } from './DiagnosticsSection';
 import { PartnerSection } from './PartnerSection';
 
 interface KnotProps {
@@ -136,6 +139,9 @@ export function Knot({ services }: KnotProps) {
 
               <Text style={styles.sectionLabel}>Backup</Text>
               <BackupSection backup={backup} />
+
+              <Text style={styles.sectionLabel}>Support</Text>
+              <DiagnosticsSection diagnosticsText={buildDiagnostics(db)} amendments={getAmendmentLog(db)} />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>

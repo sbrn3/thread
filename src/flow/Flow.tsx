@@ -8,10 +8,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { Cue } from '../cue';
 import { getPendingReport, markApplied, type PendingReport } from '../lab/analysis/report';
+import { phaseMetrics, type PhaseMetric } from '../lab/analysis/reversal';
 import { getPendingLadderResponse, markLadderResponded, type PendingLapseResponse } from '../lab/lapse';
 import { gradeProbe, resolveTodaysProbe, type DailyProbe, type ProbeGrade } from '../lab/probe';
 import { getProfile } from '../lab/profile';
 import { eyeballDates, isSrbaiDue, saveSrbai, type SrbaiAnswers } from '../lab/srbai';
+import { buildYearReview, isYearReviewDue, type YearReviewReport } from '../lab/analysis/yearReview';
 import { computeStreak, meta } from '../log/log';
 import type { Services } from '../services';
 import { useSession } from '../state/session';
@@ -27,6 +29,7 @@ import { ScriptureZone } from './ScriptureZone';
 import { SealZone } from './SealZone';
 import { SrbaiZone } from './SrbaiZone';
 import { WeaveZone } from './WeaveZone';
+import { YearReviewZone } from './YearReviewZone';
 import { DismissalZone } from './DismissalZone';
 import { ThreadRail } from './ThreadRail';
 
@@ -82,8 +85,12 @@ export function Flow({ services }: FlowProps) {
   // §15 — reports surface once, after a seal, never before or during
   // reading.
   const [pendingReport, setPendingReport] = useState<PendingReport | null>(null);
+  const [reportPhases, setReportPhases] = useState<PhaseMetric[]>([]);
   useEffect(() => {
-    if (session.sealedToday) setPendingReport(getPendingReport(db));
+    if (!session.sealedToday) return;
+    const report = getPendingReport(db);
+    setPendingReport(report);
+    setReportPhases(report ? phaseMetrics(db, report.expId) : []);
   }, [session.sealedToday, db]);
 
   // §09/§19 — SRBAI + the monthly eyeball, once a month, after a seal.
@@ -98,6 +105,22 @@ export function Flow({ services }: FlowProps) {
     },
     [db, today],
   );
+
+  // §12 R6 "the year" — due exactly once, day 365+.
+  const [yearReview, setYearReview] = useState<YearReviewReport | null>(null);
+  useEffect(() => {
+    if (!session.sealedToday) return;
+    const trialStart = meta.get(db, 'trial_start');
+    if (!trialStart) return;
+    if (isYearReviewDue(db, today, trialStart, meta.get(db, 'year_review_shown') === '1')) {
+      setYearReview(buildYearReview(db, today, trialStart));
+    }
+  }, [session.sealedToday, db, today]);
+
+  const handleDismissYearReview = useCallback(() => {
+    meta.set(db, 'year_review_shown', '1');
+    setYearReview(null);
+  }, [db]);
 
   const handleApplyReport = useCallback(
     (expId: string) => {
@@ -448,10 +471,12 @@ export function Flow({ services }: FlowProps) {
               needsNextBookPick={session.nextBookNeeded}
               onPickNextBook={handlePickNextBook}
               pendingReport={pendingReport}
+              reportPhases={reportPhases}
               onApplyReport={handleApplyReport}
               onKeepReport={handleKeepReport}
             />
             {srbaiDue && <SrbaiZone eyeballDates={eyeballDates(db, today)} onSave={handleSaveSrbai} />}
+            {yearReview && <YearReviewZone report={yearReview} onDismiss={handleDismissYearReview} />}
           </>
         )}
       </Animated.ScrollView>

@@ -223,8 +223,21 @@ const V8: string[] = [
 // srbai (V1). Additive; q1-q4 untouched.
 const V9: string[] = [`ALTER TABLE srbai ADD COLUMN reflection TEXT`];
 
+// v10 — §19 error log + copy-diagnostics: "support with zero
+// telemetry." Nothing leaves the phone; this is purely local, read
+// only by the user's own "copy diagnostics" action.
+const V10: string[] = [
+  `CREATE TABLE IF NOT EXISTS error_log (
+    id INTEGER PRIMARY KEY,
+    ts INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    stack TEXT,
+    build_sha TEXT
+  )`,
+];
+
 // Index = schema version - 1. New migrations append; nothing is edited.
-export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7, V8, V9];
+export const MIGRATIONS: string[][] = [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10];
 
 export function migrate(db: SqlDb): void {
   const row = db.get<{ user_version: number }>('PRAGMA user_version');
