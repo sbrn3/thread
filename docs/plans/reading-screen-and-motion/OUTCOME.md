@@ -34,6 +34,14 @@ A review of the whole diff against plan.html and exec.md found:
   - no `Math.random` and no `fontStyle`.
 
 ## Remaining gaps (device)
+
+**First, and blocking:** a blank white screen.
+- **What was seen:** on 2026-10-10 the dev app ran a dev bundle of `743eab4` (waves 3–4, plus the then-uncommitted #77 fix). It showed a full white frame, and uiautomator found no nodes. JS logged `flowRender` 1519, `sessionReady` 3302, `weaveFirstFrame` 3312 and `launchDismissed` 3634 ms, with no errors.
+- **Comparison:** `v0.12.0` from the same Metro rendered normally ten minutes earlier.
+- **Confidence:** seen once and not reproduced.
+- **Also:** `[study] prewarm` logged three times when it should log once. Its effect re-ran, which is worth a look while bisecting.
+- **Next step:** cold-start `main` twice. If it's blank, bisect #72, #74 and #75 (wave 5's fold fix).
+
 The phone was in use by another session through waves 2–5, so none of these have been seen on a device:
 - **cb00f1a:** a held seal stays blue after the finger lifts, and no `hold_cancel` is logged after a commit.
 - **S04:**

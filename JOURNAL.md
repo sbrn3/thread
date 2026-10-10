@@ -5,6 +5,24 @@ changed, why, and anything the next session needs to know.
 
 ---
 
+## 2026-10-11 — every session wrapped up; one plan for what's next
+
+The owner asked for all the sessions to be wrapped up and the docs brought into line. STATUS.md was rewritten around one ordered **Next actions** list. Read that first; this entry only records what happened.
+
+- **Sessions:**
+  - bible-reading-app-76 (headnotes and the device sweep) stopped. All its work is merged (#64, #66, #67, #70, #71, #73, #77).
+  - bible-reading-app-62 had nothing open.
+  - This session (reading-screen-and-motion) stopped after the docs.
+  - No session is driving the phone.
+- **Saved from loss:**
+  - The experiments opt-in plan (experiment-suite-review, C4) was uncommitted in `thread-experiment-suite-review/` after its session closed. It is now committed as it was, on branch `docs/experiment-suite-review` (`b9e5866`). It isn't approved and isn't on main.
+  - A 2026-10-07 side-tab journal entry (API-key help) was uncommitted in `thread/`. It's now in place below.
+- **Found, not yet fixed:**
+  - **A blank white screen**, seen once on the dev app running `743eab4` (waves 3–4): JS reached `launchDismissed` with no errors. It's unreproduced, and it blocks any release from main (Next actions 1).
+  - **The real app still has #77's backup bug**, so every second recovery snapshot fails. A `v0.12.1` patch cut from `v0.12.0` is proposed (Next actions 2).
+- **Dev app data:** deliberately not restored at the owner's request. Sealing is "hold", the v0.11.0 card is dismissed, and its recovery folder heals on the next snapshot.
+- **The release app:** v0.11.0 was installed over it on 2026-10-10 with `adb install -r`, keeping its data. It wasn't opened.
+
 ## 2026-10-10 — reading screen and motion built (C4); waves 1–2 shipped in v0.12.0
 
 Merged in wave order:
@@ -65,6 +83,17 @@ Design: five rounds. Headnotes was chosen in round 3, and round 5 kept it clean 
 **Why:** these are the reader's own words. A typo or a regretted line has to be fixable, which the log's append-only rule can't allow. Making a takeaway optional keeps the seal unchanged and keeps it from becoming a chore.
 **Consequences:** migrations are additive-only, so the table is permanent once shipped. Takeaways can't be reconstructed from the log, so backup and the unravel must handle them explicitly. Book summaries will have gaps on days with no takeaway.
 **Branch:** main (grill only; `docs/plans/bibleproject-book-videos/`)
+
+## Side-tab 2026-10-07 — API-key instructions for licensed translations
+
+**Job:** explain how to get an NIV/ESV API key in Settings → Translation (and onboarding).
+**Changes:**
+- New shared `src/ui/KeyGuide.tsx`: one line on why a key is needed, three numbered steps per publisher, and a signup link with a typed-URL fallback. It is used in `knot/TranslationSection.tsx` and `onboarding/screens/TranslationScreen.tsx`.
+- Steps checked against the publishers' docs. API.Bible: dashboard → **Plan** → edit plan → add the NIV (Starter allows up to 3 copyrighted Bibles, no approval needed). ESV: `api.esv.org/account/create-application/`.
+- Defined "Licensed translation" in `docs/CONTEXT.md`. Registered KeyGuide in `ui-contracts` and `brand-voice-inventory`.
+- Committed and pushed as `1dd4325`.
+**Handoff:** not yet checked on a device: the links open the right pages, and onboarding step 4 still fits a small phone. Neither key provider has been tried with a real key.
+**Branch:** main
 
 ## Decision 2026-10-07 — Apple support parked; the web/PWA plan is discarded
 
