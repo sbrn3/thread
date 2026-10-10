@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — Experiments opt-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet">
+<style>
+/* ── One Blue Thread identity — mirrors docs/index.html / src/ui/tokens.ts. Do not swap for generic styles ── */
+:root {
+  --bg:            #FBFAF7;
+  --surface:       #ffffff;
+  --card-bg:       #ffffff;
+  --border:        #E6E5E1;
+  --border-strong: #d8d7d2;
+  --text:          #16161A;
+  --text-2:        #5E5D66;
+  --text-muted:    #9C9BA3;
+  --primary:       #1F3FFF;
+  --primary-dark:  #1732cc;
+  --primary-tint:  #EEF0FF;
+  --success:       #155724;
+  --success-bg:    #d4edda;
+  --warning:       #856404;
+  --warning-bg:    #fff3cd;
+  --danger:        #c0392b;
+  --danger-bg:     #fde8e8;
+  --font-head:     'Newsreader', Georgia, serif;
+  --font-body:     'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
+  --radius:        12px;
+  --shadow:        0 4px 6px rgba(0,0,0,0.08);
+  --shadow-lg:     0 8px 32px rgba(0,0,0,0.16);
+}
+* { box-sizing: border-box; }
+body {
+  font-family: var(--font-body);
+  background:
+    radial-gradient(600px 400px at 0% -5%, rgba(26,58,92,0.06), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2.2rem 1.6rem 4rem;
+}
+h1 { font-family: var(--font-head); font-size: 2rem; font-weight: 400; margin: 0 0 .3rem; letter-spacing: .01em; }
+h2 { font-family: var(--font-head); font-size: 1.25rem; font-weight: 400; color: var(--primary); margin: 1.8rem 0 .8rem; }
+h3 { font-size: .95rem; font-weight: 600; color: var(--text); margin: 1.3rem 0 .4rem; }
+a { color: var(--primary); }
+code { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: .85em; color: var(--primary-dark); background: var(--primary-tint); padding: .1em .4em; border-radius: 5px; }
+.meta { font-size: .82rem; color: var(--text-muted); margin-bottom: 1.6rem; display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.badge { display: inline-block; padding: .25em .7em; border-radius: 999px; font-size: .74rem; font-weight: 600; border: 1px solid var(--border); background: var(--surface); }
+.badge.navy   { color: var(--primary); border-color: var(--primary); background: var(--primary-tint); }
+.badge.green  { color: var(--success); background: var(--success-bg); border-color: #c3e6cb; }
+.badge.yellow { color: var(--warning); background: var(--warning-bg); border-color: #ffeeba; }
+.badge.red    { color: var(--danger);  background: var(--danger-bg);  border-color: #f5c6cb; }
+/* Stat row */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap: .8rem; margin-bottom: 2rem; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem 1.1rem; box-shadow: var(--shadow); }
+.stat-value { font-family: var(--font-head); font-size: 1.7rem; color: var(--primary); font-variant-numeric: tabular-nums; }
+.stat-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+/* Tabs */
+.tabs { display: flex; gap: .4rem; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 1.6rem; }
+.tab { padding: .5rem 1rem; border: none; background: none; cursor: pointer; font-family: var(--font-body); font-size: .87rem; color: var(--text-2); border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab:hover { color: var(--text); background: var(--primary-tint); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; background: var(--primary-tint); }
+.panel { display: none; animation: fade .25s ease; }
+.panel.active { display: block; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* Checklist */
+.checklist { list-style: none; padding: 0; margin: .5rem 0; }
+.checklist li { display: flex; align-items: flex-start; gap: .6rem; padding: .4rem 0; font-size: .9rem; border-bottom: 1px solid var(--border); }
+.checklist li:last-child { border-bottom: none; }
+.checklist input { margin-top: .3rem; flex-shrink: 0; accent-color: var(--primary); width: 16px; height: 16px; }
+.checklist input:checked + span { color: var(--text-muted); text-decoration: line-through; }
+/* Notes / callouts */
+.note { background: var(--warning-bg); border: 1px solid #ffeeba; border-radius: var(--radius); padding: .7rem 1rem; font-size: .86rem; margin: .8rem 0; color: var(--text); }
+.mockup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: .9rem; margin: 1rem 0; }
+.mockup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; box-shadow: var(--shadow); }
+.mockup-card.chosen { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), var(--shadow-lg); }
+.mockup-card h3 { margin-top: 0; }
+.requirements { font-size: .92rem; line-height: 2; padding-left: 1.3rem; }
+.evidence-table { width: 100%; border-collapse: collapse; margin: .8rem 0 1.2rem; font-size: .84rem; }
+.evidence-table th, .evidence-table td { border: 1px solid var(--border); padding: .55rem .65rem; text-align: left; vertical-align: top; }
+.evidence-table th { background: var(--primary-tint); color: var(--primary); }
+</style>
+</head>
+<body>
+
+
+<h1>Experiments opt-in</h1>
+<div class="meta">
+  2026-10-10
+  <span class="badge navy">C4</span>
+  <span class="badge navy">~38 files</span>
+  <span class="badge navy">~9 PRs</span>
+  <span class="badge yellow">~8 sessions</span>
+  <span class="badge green">Smart Review: 14 findings resolved</span>
+  <span class="badge green">Direction C chosen</span>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><div class="stat-value">38</div><div class="stat-label">Files</div></div>
+  <div class="stat"><div class="stat-value">8</div><div class="stat-label">Slices</div></div>
+  <div class="stat"><div class="stat-value">16</div><div class="stat-label">Test files</div></div>
+  <div class="stat"><div class="stat-value">~8</div><div class="stat-label">Sessions</div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="intent" onclick="show('intent')">Intent</button>
+  <button class="tab" data-tab="requirements" onclick="show('requirements')">Requirements</button>
+  <button class="tab" data-tab="aesthetics" onclick="show('aesthetics')">Aesthetics</button>
+  <button class="tab" data-tab="execution" onclick="show('execution')">Execution</button>
+  <button class="tab" data-tab="review" onclick="show('review')">Smart Review</button>
+  <button class="tab" data-tab="verify" onclick="show('verify')">Verification</button>
+</div>
+
+<div id="intent" class="panel active">
+  <h2>Problem &amp; Intent</h2>
+  <h3>Status, owner &amp; next action</h3>
+  <p><strong>Draft, waiting on the owner's approval.</strong> On 2026-10-10 the owner asked whether the experiment suite still fits its purpose ("I'm worried it overcomplicates things and messes with the user experience"). This plan came out of <code>/grill</code>; see <a href="grill-summary.md">grill-summary.md</a> → Confirmed understanding. Next action: once the owner approves, S00 rebases this branch and starts the single merge-and-deploy run in <a href="exec.md">exec.md</a>.</p>
+  <h3>Outcome and constraints</h3>
+  <p>The owner couldn't tell what the next-day probe was, sitting next to their own memory passages. Their daily reading had also shrunk to a few verses with no explanation, and most of their misses come from life, such as camping or a change of roster. The outcome: <strong>a reading app first</strong>. Research is something a reader opts into, and the reading never changes without the reader seeing why.</p>
+  <ul>
+    <li>Experiments is off by default and off on every existing install. The owner's phone starts clean.</li>
+    <li>With it off, nothing is learned or randomized, and the six behaviours are plain settings.</li>
+    <li>With it on, the app learns only from experiments, and every conclusion is a suggestion the reader applies.</li>
+    <li>Constraints from <code>AGENTS.md</code>:
+      <ul>
+        <li><code>events</code> is append-only;</li>
+        <li>no migration, and none is needed;</li>
+        <li>seeded PRNG only;</li>
+        <li><code>/src/lab</code> never imports <code>/src/ui</code>;</li>
+        <li><code>reconcile()</code> stays idempotent and replay-correct;</li>
+        <li>everything stays on the device.</li>
+      </ul>
+    </li>
+  </ul>
+  <h3>Scope and non-goals</h3>
+  <p><strong>In scope:</strong></p>
+  <ul>
+    <li>the Experiments switch, with on/off state recorded as events;</li>
+    <li>a behaviours resolver, so every reversal actually applies its arm;</li>
+    <li>gating for the reversals, SRBAI, reports, E6, E10 and the bandit;</li>
+    <li>removing the E9 probe, with E10 scored on sealing alone;</li>
+    <li>the visible dose ladder and "Read the whole chapter", plus a fix for resuming a sitting;</li>
+    <li>a fixed nudge when off, the future schedule reset on toggle, and nudge delivery recorded;</li>
+    <li>a year-review verdict for readers who never answered SRBAI;</li>
+    <li>the knot's Reading settings and Experiments rows (direction C);</li>
+    <li>docs, website copy and a release.</li>
+  </ul>
+  <p><strong>Not in scope:</strong> the rest of the lapse ladder (one question, off-ramp, dormancy and partner hand-off are unchanged), marking planned time away (declined at grill), sitting-length policy, and a component renderer for tests.</p>
+  <h3>Dependencies and unresolved gates</h3>
+  <ul>
+    <li><strong>reading-screen-and-motion has already landed.</strong> Its S06, S08 and S09 are on <code>main</code> (<code>743eab4</code>), and <code>v0.12.0</code> is tagged. The owner's earlier "probe removal first" ordering no longer applies.
+      <ul>
+        <li>S01 removes the probe from S06's "Before you read" list (<code>src/flow/beforeList.ts</code>, <code>BeforeYouRead.tsx</code>, <code>test/beforeList.test.ts</code>).</li>
+        <li>S02 puts the dose note under S06's <code>verses a–b</code> subline.</li>
+        <li>This plan's release is <code>v0.13.0</code>.</li>
+      </ul>
+    </li>
+    <li><strong>Release gate.</strong> The mandatory device checklist (for notification scheduling) must pass on the dev client before the tag. If the phone is busy or missing, the merges stand and the tag waits.</li>
+    <li><strong>Authorization.</strong> The owner authorized commit, push, PRs, ordered merges and the tag in one run. It covers nothing outside this plan.</li>
+    <li>No product decisions are left unresolved.</li>
+  </ul>
+  <h3>Evidence and decisions</h3>
+  <ul>
+    <li><strong>Why the reading shrank.</strong> <code>diagnose()</code> in <code>src/lab/steps.ts</code> steps <code>meta.dose</code> down a rung on day 2 of every lapse, and back up only after a 7-day sealed streak. <code>todaysTarget</code> in <code>src/lab/dose.ts</code> gives that rung priority over everything else. Nothing on screen said so.</li>
+    <li><strong>One-verse sittings.</strong> At that rung, <code>splitSittings(chapter, 1)</code> in <code>src/text/sittings.ts</code> cuts a chapter into roughly one sitting per verse. The stored <code>current_sitting</code> index then points at the wrong verses when the target changes, because <code>session.load</code> only clamps it. This matches the 11 sittings for James 4 that reading-screen-and-motion noticed in the owner's data.</li>
+    <li><strong>E1, E3 and E4 never applied their arms.</strong> <code>Flow.tsx</code> (~669) reads <code>seal</code>, <code>floor</code> and <code>streakVisible</code> from <code>profile</code> only. Only E7 (<code>notifier.ts</code> <code>e7ArmBActive</code>) and E11/E12 (<code>arrivalVisibility.ts</code>) read the active phase.</li>
+    <li><strong>The nudge trial couldn't learn.</strong> Nothing set <code>delivered = 1</code> for a sent nudge. <code>cancelToday</code> voided nudges that had already fired before the seal. <code>session.seal</code> hard-codes <code>before_nudge: 1</code>.</li>
+    <li><strong>E6's <code>re_entry</code> arm has no consumer.</strong> It stays behind the switch.</li>
+    <li><strong>The year review.</strong> <code>verdictFor</code> in <code>analysis/yearReview.ts</code> calls any reader with no SRBAI data "compliance, not a habit yet".</li>
+    <li><strong>The probe is safe to remove.</strong> <code>weightedPick</code> is keyed per call, so no other seeded draw moves. The <code>probes</code> table and the historical event types stay.</li>
+    <li><strong>Decisions.</strong> These come from the <a href="grill-summary.md">grill</a> (rounds 1–5), the JOURNAL Decision 2026-10-10, and the owner's /plan answers on 2026-10-10:
+      <ul>
+        <li>probe removal goes before S06 (moot now that S06 has landed);</li>
+        <li>the mechanic-friction switch to tap is offered, never applied silently;</li>
+        <li>changing a tested setting ends that test;</li>
+        <li>with Experiments off, a nudge goes out on every unread day in the cue's wording;</li>
+        <li>knot direction C;</li>
+        <li>the Smart Review is authorized;</li>
+        <li>merge and deploy happen in one run.</li>
+      </ul>
+    </li>
+    <li><strong>Calls the planner made, for review at approval:</strong>
+      <ul>
+        <li>the lab clock starts the day after switching on, with no 21-day baseline;</li>
+        <li>E10 and the bandit count from the same start;</li>
+        <li>completed experiments keep their reports when switched back on;</li>
+        <li>an applied suggestion stays as a setting when Experiments is turned off;</li>
+        <li>a reader's choice retires that experiment for good, so the queue never restarts a test the reader ended;</li>
+        <li>cue strength counts only days from this build on, because older days all carry a hard-coded "before the nudge".</li>
+      </ul>
+    </li>
+  </ul>
+  <h3>Documentation effects</h3>
+  <ul>
+    <li><code>README.md</code> and <code>docs/index.html</code> (the probe block).</li>
+    <li><code>docs/what-thread-asks-you.html</code>, rewritten as two prompts.</li>
+    <li><code>docs/CONTEXT.md</code>: the probe span entry is removed in S01. The four new terms were added at the grill.</li>
+    <li><code>ROADMAP.md</code>, <code>STATUS.md</code> and <code>docs/plans/README.md</code>, kept in sync.</li>
+    <li>A <code>JOURNAL.md</code> session entry that refers to the Decision rather than restating it.</li>
+    <li>A What's new entry.</li>
+    <li><code>OUTCOME.md</code>.</li>
+  </ul>
+</div>
+
+<div id="requirements" class="panel">
+  <h2>Requirements (confirmed)</h2>
+  <h3>User stories</h3>
+  <ol class="requirements">
+    <li>As a reader, I want the app to run no experiments unless I turn Experiments on, so that it's simply a reading app.</li>
+    <li>As a reader with Experiments off, I want to see How often, What counts as read, Sealing, Streak, Day count and Sitting count in Reading settings, at today's defaults, and change any of them, so that nothing about my reading is hidden.</li>
+    <li>As a reader, I want one line explaining what Experiments does (3-week tests, a monthly question, suggestions) before I turn it on.</li>
+    <li>As a reader with Experiments on, I want to see what's being tested, until when, and what comes next, so that changes never surprise me.</li>
+    <li>As a reader, I want a finished experiment to offer a suggestion with its reason, which I can apply or keep at the seal or later in the knot. Nothing should change until I apply it.</li>
+    <li>As a reader, I want changing a setting that's being tested to end that test, so that my choice always wins.</li>
+    <li>As a reader, I don't want the next-day "what do you remember" probe any more. My memory passages are where I practise remembering.</li>
+    <li>As the lab (a silent actor), I want E10 to score dose arms on sealing alone, so that it still works without the probe.</li>
+    <li>As a reader whose reading was shortened after missed days, I want one line saying so and why.</li>
+    <li>As that reader, I want "Read the whole chapter" to give me the rest of today's chapter from the next unread verse, and to put the dose ladder back at the top.</li>
+    <li>As a reader on an E10 dose day, I want the note to say the length is part of an experiment, with the same option.</li>
+    <li>As a reader whose dose changes mid-chapter, I want to resume at the next unread verse, neither re-reading nor skipping.</li>
+    <li>As the lab, I want every reversal (E1, E3, E4, E7, E11, E12) to apply its arm while active, so that verdicts measure real differences.</li>
+    <li>As the owner, I want my phone to start with Experiments off, the in-progress phase stopped and no prompts, with the old rows kept.</li>
+    <li>As the lab, I want switching on again to restart the queue from the first experiment without a report, so that a stopped phase is never resumed half-way.</li>
+    <li>As the lab, I want on/off recorded in the append-only log and read per day, so that <code>reconcile()</code> replay stays exact.</li>
+    <li>As a reader who never answers the monthly check-in, I want a fair year review, not "compliance, not a habit".</li>
+    <li>As a reader with Experiments off, I want no monthly SRBAI prompt and no phase report after the seal.</li>
+    <li>As a reader with Experiments off, I want one nudge at my nudge hour on any day I haven't sealed, in the cue's words, and never more than one a day.</li>
+    <li>As a reader, I want switching Experiments on or off to rebuild my upcoming nudges, so that a leftover experimental silent day can't swallow a reminder.</li>
+    <li>As the lab, I want each nudge's delivery recorded (from the OS schedule at the next open, and from a received notification while the app is open), so that the nudge trial and the bandit can learn.</li>
+    <li>As the lab, I want a nudge that fired before the seal to count as delivered, and only a nudge cancelled by an earlier seal to be voided.</li>
+    <li>As a screen-reader user, I want the switch, the choice chips and Read the whole chapter labelled, at least 44 pt, and in reading order.</li>
+    <li>As an offline reader, I want all of this to work with no network. It reads only local SQLite and the bundled WEB text.</li>
+    <li>As a reader whose holds keep getting cancelled, I want to be asked "switch to tap?" before I read, with Switch or Keep hold, instead of being switched without asking.</li>
+  </ol>
+  <h3>Out of Scope</h3>
+  <ul class="requirements">
+    <li>The lapse ladder's question, off-ramp, dormancy and partner tiers. The grill left them as they are.</li>
+    <li>Marking time away for camping or a roster change. Declined at grill round 2.</li>
+    <li>Changing the 40-verse sitting threshold. It deserves a separate look.</li>
+    <li>A new migration. Delivered <code>-1</code>, <code>meta.current_verse</code> and the new event types need none.</li>
+    <li>Rendering-based UI tests. There's no renderer yet; see <code>STATUS.md</code> Next actions.</li>
+  </ul>
+  <h3>Testing Decisions</h3>
+  <ul class="requirements">
+    <li>What gets tested: pure logic on the public seams, against <code>better-sqlite3</code> via <code>test/util/testDb.ts</code>.
+      <ul>
+        <li><code>experimentsOnAt</code>, <code>labStart</code>, <code>setExperiments</code></li>
+        <li><code>effectiveBehaviour</code>, <code>behaviourSource</code>, <code>chooseBehaviour</code></li>
+        <li><code>advancePhase</code> and <code>diagnose</code> gating</li>
+        <li><code>todaysDose</code>, <code>remainderFrom</code>, <code>session.readWholeChapter</code> and resume</li>
+        <li>the notifier: <code>syncWindow</code>, <code>resetFutureWindow</code>, <code>recordDeliveries</code>, <code>cancelToday</code>, using the existing fake <code>NotificationsLike</code></li>
+        <li><code>verdictFor</code></li>
+      </ul>
+    </li>
+    <li>Prior art:
+      <ul>
+        <li><code>test/reconcile-steps.test.ts</code> (including idempotency)</li>
+        <li><code>test/lab.test.ts</code></li>
+        <li><code>test/notify.test.ts</code></li>
+        <li><code>test/session.test.ts</code></li>
+        <li><code>test/sittings.test.ts</code></li>
+        <li><code>test/year-review.test.ts</code></li>
+        <li><code>test/ui-contracts.test.ts</code> (source contracts and the allowlist)</li>
+      </ul>
+    </li>
+    <li>Deleted along with the code they cover: <code>test/probe.test.ts</code> and <code>test/probe-span.test.ts</code>.</li>
+    <li>Not unit-tested: how the knot and the arrival note look, real OS delivery timing, and the foreground listener. The device checklist covers these.</li>
+  </ul>
+</div>
+
+<div id="aesthetics" class="panel">
+  <h2>Aesthetics</h2>
+  <h3>Current-surface extraction</h3>
+  <table class="evidence-table">
+    <thead><tr><th>Layer</th><th>Current measured values/patterns</th><th>Source</th><th>Keep/change and why</th></tr></thead>
+    <tbody>
+      <tr><td>Tokens</td><td>paper #F4F1E9, ink #1A1A17, thread #2E3A8C, madder #B5482F, dyeSoft #E7E9F4, ink60 #5B584F, ink40 #726D5C, ink15 #E0DACB; space 4–48; pill radius 999; minTarget 44</td><td><code>src/ui/tokens.ts</code></td><td>Keep. No new tokens.</td></tr>
+      <tr><td>Typography</td><td>Group labels: mono 11, caps, letter-spacing 1.5, ink40. Summary: display 15/600. Hint: mono 12/18, ink60. Arrival: day in mono 12 caps, cue in scriptureItalic 19/28, title in display 900/34, progress in mono 12.</td><td><code>MoreSection.tsx</code>, <code>DisclosureSection.tsx</code>, <code>SealModeSection.tsx</code>, <code>ArrivalZone.tsx</code></td><td>Keep. Source lines and the dose note reuse the mono hint style.</td></tr>
+      <tr><td>Spacing and layout</td><td>Disclosure rows: at least 48 tall, a 1 px ink15 top rule, a 12 px nested indent. Arrival: gap 12, padding 32/48.</td><td>same</td><td>Keep. The dose note sits inside the arrival gap.</td></tr>
+      <tr><td>Color and semantics</td><td>Thread: progress or chosen. Madder: a mark you made, or attention. Ink40: secondary.</td><td><code>tokens.ts</code> notes</td><td>Thread marks "suggested" and the dose note's rule. Madder marks "being tested", because that setting changes under you.</td></tr>
+      <tr><td>Components and states</td><td><code>DisclosureSection</code> (status, attention), <code>ChoiceChip</code> (selected), <code>ActionButton</code> secondary/quiet, RN <code>Switch</code> (used in <code>BackupSection</code>).</td><td><code>src/ui/controls.tsx</code>, <code>src/knot/*</code></td><td>Reuse only; no new primitive. States: off, on, testing, suggested, chosen, lapse, earlier.</td></tr>
+      <tr><td>Atmosphere and depth</td><td>Flat linen, hairline rules, no shadows.</td><td><code>tokens.ts</code> header</td><td>Keep. Suggestion cards get a 1 px ink15 border at radius 12.</td></tr>
+      <tr><td>Motion and interaction</td><td>Disclosures open in place, the Modal slides, and reduce motion is honoured via <code>ui/motion.ts</code>.</td><td><code>tokens.motion</code></td><td>No new motion. The note disappears instantly after the tap.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Intent:</strong> settings read as plain choices, and research reads as a separate, optional room. This extends existing patterns rather than adding new ones. <strong>Hygiene:</strong> exact <code>tokens.ts</code> values, in the single Loom register.</p>
+  <p><strong>Details:</strong></p>
+  <ul>
+    <li>Pressed state: opacity 0.7.</li>
+    <li>Selected chip: dyeSoft fill with a thread border.</li>
+    <li>With Experiments off, rows show no status labels.</li>
+    <li>No loading state, because the SQLite reads are synchronous.</li>
+    <li>A failed Apply leaves the suggestion card in place.</li>
+    <li>Chips wrap at large font scale.</li>
+    <li>The note's button is a 44 pt quiet ActionButton.</li>
+  </ul>
+  <h3>Mockups</h3>
+  <div class="mockup-grid">
+    <div class="mockup-card chosen"><h3>C · Under Experiments (chosen)</h3><p>A "Reading settings" row holds the six choices and where each came from. An "Experiments" row holds the switch, suggestions waiting to be applied, the current test, what's queued next, and Adaptive nudges. The owner chose this on 2026-10-10.</p><a href="mockup.html#c">Open approved mockup ↗</a></div>
+    <div class="mockup-card"><h3>A · Six rows (rejected)</h3><p>One disclosure row per behaviour, plus a separate Experiments switch row.</p><a href="mockup.html#a">Open ↗</a></div>
+    <div class="mockup-card"><h3>B · One panel (rejected)</h3><p>A single "How reading works" row with segmented choices and the switch at the foot.</p><a href="mockup.html#b">Open ↗</a></div>
+    <div class="mockup-card chosen"><h3>Dose note (set at grill)</h3><p>One line plus "Read the whole chapter", shown in three states: after a lapse, on an E10 day, and after the tap.</p><a href="mockup.html#dose">Open ↗</a></div>
+  </div>
+  <p class="note">Chosen direction: <strong>C</strong>. A plain reader sees two quiet rows. Everything research-shaped, including the old Adaptive policy row, lives in one place. The rejected directions stay in <code>mockup.html</code> until approval and are pruned afterwards.</p>
+</div>
+
+<div id="execution" class="panel">
+  <h2>Execution</h2>
+  <p><strong>Grade C4.</strong> About 38 files in eight slices across five layers (<code>lab</code>, <code>flow</code>, <code>knot</code>, <code>notify</code>, <code>state</code>). It changes two protected mechanisms (notification scheduling and <code>reconcile()</code> output) and adds new cross-layer state.</p>
+  <p>The authoritative recipes, commands, budgets, branches and rollbacks are in <a href="exec.md">exec.md</a>. Live status is recorded only in <a href="PROGRESS.md">PROGRESS.md</a>.</p>
+  <p>The slices run serially and inline, one PR each, merged in order in one authorized run:</p>
+  <ul>
+    <li><strong>S00:</strong> rebase onto <code>main</code> and commit the plan.</li>
+    <li><strong>S01:</strong> remove the probe.</li>
+    <li><strong>S02:</strong> make the dose ladder visible, and fix sitting resume. The note goes into S06's new header.</li>
+    <li><strong>S03:</strong> the Experiments switch and the behaviours resolver. Lab only; high-effort.</li>
+    <li><strong>S04:</strong> the reading screen follows the behaviours, and the year review gets its new verdict.</li>
+    <li><strong>S05:</strong> nudges and delivery recording. High-effort.</li>
+    <li><strong>S06:</strong> the knot, in direction C.</li>
+    <li><strong>S07:</strong> docs, the device checklist, the final audit and the tag. It stops before the tag if the checklist can't run.</li>
+  </ul>
+</div>
+
+<div id="review" class="panel">
+  <h2>Smart Review</h2>
+  <p>An independent read-only reviewer checked the draft <code>exec.md</code> against the code on 2026-10-10. It reported 6 HIGH, 6 MEDIUM and 2 LOW findings. All are resolved in <code>exec.md</code>, and one needed an owner decision.</p>
+  <table class="evidence-table">
+    <thead><tr><th>Finding</th><th>Resolution</th></tr></thead>
+    <tbody>
+      <tr><td><strong>HIGH 1:</strong> a nudge marked delivered after its day is closed never gets a reward, because <code>attributeRewards</code> and <code>updateBandit</code> only touch the date being closed.</td><td>S05: a late-reward sweep covers earlier <code>delivered = 1</code> rows with no reward, scoring each against its own day. Deliveries are recorded before reconcile on every open and every return to the foreground.</td></tr>
+      <tr><td><strong>HIGH 2:</strong> inferring delivery would mark every past cancelled nudge as delivered, and also any nudge after permission was revoked.</td><td>Each new row stores <code>ctx.triggerAt</code>, and inference applies only to rows that have it. A one-time pass sets old <code>0</code> rows to <code>-1</code>, and inference is skipped without permission.</td></tr>
+      <tr><td><strong>HIGH 3:</strong> changing a setting under test restarts the same test, because "first experiment with no report" picks it again.</td><td>A <code>setting_changed</code> event after an experiment's start retires that experiment. "Next" is defined exactly in Shared facts.</td></tr>
+      <tr><td><strong>HIGH 4:</strong> keying completion on <code>reports</code> lets an all-disturbed experiment be reseeded over its <code>done</code> rows.</td><td>An experiment counts as complete once phase 3 is <code>done</code>, and <code>seedPhase</code> never overwrites a <code>done</code> row.</td></tr>
+      <tr><td><strong>HIGH 5:</strong> resuming from a verse number could skip a merged-forward chapter.</td><td>The position is stored as <code>chapter:verse</code>. A rebuilt remainder sets <code>portionChapters = [chapter]</code> and never merges forward, and there's a test for a short chapter.</td></tr>
+      <tr><td><strong>HIGH 6:</strong> reading-motion S06 had already merged, and v0.12.0 was tagged, so S01 and S02 targeted files that had moved.</td><td>S01 and S02 are rewritten against <code>beforeList.ts</code>, <code>BeforeYouRead.tsx</code>, <code>test/beforeList.test.ts</code> and the new ArrivalZone header. The ordering dependency is dropped and the release is now v0.13.0.</td></tr>
+      <tr><td><strong>MED:</strong> S03 doesn't typecheck on its own, because of the new <code>getPendingReport</code> parameter.</td><td>The parameter is optional.</td></tr>
+      <tr><td><strong>MED:</strong> <code>before_nudge</code> is decided after the seal is written, and the app doesn't re-sync when it comes back to the foreground.</td><td><code>nudgeStateToday</code> is checked before the seal event, and an AppState hook re-runs it on return.</td></tr>
+      <tr><td><strong>MED:</strong> real <code>before_nudge</code> values would make old history look like <code>cue_collapse</code>.</td><td>Cue strength counts only from <code>meta.cue_strength_since</code>.</td></tr>
+      <tr><td><strong>MED:</strong> the mechanic-friction override would lose to the E1 arm, and with Experiments off it learns from everyday use.</td><td><strong>Owner decided 2026-10-10:</strong> offer it, don't do it. It becomes a "switch to tap?" lapse row (story 25, S03 and S04).</td></tr>
+      <tr><td><strong>MED:</strong> "the cue hour at row time" isn't the real trigger time.</td><td>The stored <code>triggerAt</code> and "still scheduled" are the source of truth.</td></tr>
+      <tr><td><strong>MED:</strong> replaying the day of a toggle sees the toggle, while the live close didn't.</td><td>Reconcile uses <code>experimentsOnAt</code> with a strict <code>&lt;</code>, the UI uses <code>experimentsOnNow</code>, and there's a test for it.</td></tr>
+      <tr><td><strong>LOW:</strong> the brand-voice inventory keeps a <code>SealModeSection</code> key.</td><td>S06 removes it, and S01 removes the ProbeZone key.</td></tr>
+      <tr><td><strong>LOW:</strong> existing tests assert the old delivered semantics.</td><td>S05 updates <code>notify.test.ts</code> (~301) and <code>reconcile-steps.test.ts</code> (~81).</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div id="verify" class="panel">
+  <h2>Verification</h2>
+  <p>Automated gates:</p>
+  <ul>
+    <li>Each slice passes its focused tests, <code>npm test</code>, <code>npm run typecheck</code> and CI on its PR.</li>
+    <li>An independent audit checks the final diff against this plan and <code>exec.md</code>. HIGH and MEDIUM findings are fixed before the tag.</li>
+  </ul>
+  <p>Notification scheduling changes, so this checklist is <strong>mandatory</strong>. Run it on the dev client only, with synthetic or restored data. The steps are in <code>exec.md</code> S07.</p>
+  <ul class="checklist">
+    <li><input type="checkbox"><span>Upgrade over v0.12 data → Experiments is Off, no SRBAI or report prompt appears, and active phases are <code>stopped</code>.</span></li>
+    <li><input type="checkbox"><span>Off, unsealed, nudge 2 minutes ahead → one notification in the cue's words. On reopen, its row has <code>delivered = 1</code>.</span></li>
+    <li><input type="checkbox"><span>Seal before the nudge → no notification. The row has <code>delivered = -1</code>.</span></li>
+    <li><input type="checkbox"><span>Seal after the nudge → <code>delivered = 1</code> and <code>sealed_before_nudge = 0</code>.</span></li>
+    <li><input type="checkbox"><span>Turn Experiments on → the future window is rebuilt with at most one nudge a day, and "Now testing: How often" shows from tomorrow.</span></li>
+    <li><input type="checkbox"><span>Turn it off again → the window is rebuilt with no silent days, and the phase is <code>stopped</code>.</span></li>
+    <li><input type="checkbox"><span>Change Sealing while it's being tested → the test ends, and the next experiment starts at the next reconcile.</span></li>
+    <li><input type="checkbox"><span>Lapse at one verse → the note shows. "Read the whole chapter" gives the rest of the chapter from the next unread verse and logs one <code>dose_reset</code>.</span></li>
+    <li><input type="checkbox"><span>Notification permission revoked → no crash, nothing scheduled, nothing marked delivered.</span></li>
+    <li><input type="checkbox"><span>Holds cancelled above 15% (synthetic data) → a "switch to tap?" row appears before reading; Keep hold changes nothing, and Switch sets tap with "You chose this".</span></li>
+  </ul>
+  <p>Visual check: compare the knot (on and off) and the arrival note against <code>mockup.html</code> at one phone width, with large font scale and reduce motion on.</p>
+</div>
+
+<script>
+function show(id){
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === id));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+}
+const KEY = 'plan-checks-' + location.pathname;
+document.querySelectorAll('.checklist input[type=checkbox]').forEach((cb, i) => {
+  cb.checked = localStorage.getItem(KEY + i) === '1';
+  cb.addEventListener('change', () => localStorage.setItem(KEY + i, cb.checked ? '1' : '0'));
+});
+</script>
+</body>
+</html>

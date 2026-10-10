@@ -24,5 +24,6 @@ Created by `/plan`; retained by `/save-plan`.
 Status: 📋 planned · 🔨 in progress · ✅ shipped · ❄️ parked.
 `knot-translation-switch` is absorbed into `knot-opener-icon` at the owner's request; its plan.html stays as the code-level recipe reference.
 | seal-affordance | The seal becomes the fell line: a button-like pill on a thread across the page, and the rail locks onto it | ✅ shipped | Merged to `main` as PR #43 (rail fix + fell-line seal), in the next release after `v0.7.0`. Open: device check of rail/line alignment, hold feel, notched phone. |
+| experiment-suite-review | The experiment engine becomes opt-in behind one Experiments switch (off by default). The probe goes, the shorter reading after a lapse says why and offers "Read the whole chapter", nudge delivery is recorded, and the knot gets Reading settings and Experiments rows | 📋 planned (saved, not approved) | C4, 8 slices. When ready: approve plan.html, then S00 rebases onto main and runs the slices through to v0.13.0. See exec.md. |
 
 Keep this table and `STATUS.md`'s Active Plans table in sync.

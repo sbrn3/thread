@@ -11,7 +11,7 @@ Status key: 📋 planned · 🔨 in progress · ✅ shipped · ❄️ parked
 - 🔨 **What's new after an update** — a quiet card above the reading after an
   update, plus every note under Knot › More › About. Every user-facing release
   tag adds a note. Plan: `docs/plans/whats-new/plan.html`.
-_(none)_
+- 📋 **Experiments become opt-in** — the research engine moves behind one Experiments switch, off by default, and the shorter reading after a lapse says why. Plan: `docs/plans/experiment-suite-review/plan.html`.
 
 ## Under consideration
 

@@ -88,6 +88,8 @@ all three bundled typefaces, and sat idle instead of pinning a core.
 
 ## Active plans
 
+- **experiment-suite-review** - 📋 planned, saved for later (C4, not yet approved). The experiment engine goes behind one Experiments switch, off by default. Also: the E9 probe is removed, the dose ladder becomes visible with "Read the whole chapter", nudge delivery is recorded, and the knot gets Reading settings and Experiments rows (direction C). The Smart Review is done. The owner authorized merge-and-deploy in one run once the plan is approved. See `docs/plans/experiment-suite-review/`.
+
 - **bibleproject-book-videos** — ✅ shipped in `v0.11.0` (C4; PRs #57–#64 and #66, plus the release PR). BibleProject overview links at a book's start and end. Optional daily **headnotes**, read back as the book's **contents** at "You finished" and in Reading history. Hairline headpiece/tailpiece ornaments. The README and website are refreshed. The device check passed. The backup export/restore round trip on a device is still owed, and unit tests cover it. See `docs/plans/bibleproject-book-videos/OUTCOME.md`.
 - **whats-new** — 🔨 in progress (C2, approved 2026-10-07). After an update, a
   quiet What's new card above the reading, and every note under Knot › More ›

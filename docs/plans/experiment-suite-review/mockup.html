@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Experiments opt-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Values from src/ui/tokens.ts ("The Loom"), not the template's older palette.
+   HTML for iteration speed; the build is React Native StyleSheet. Every element
+   here maps to an existing primitive: DisclosureSection, ChoiceChip,
+   ActionButton (secondary/quiet), RN Switch. Synthetic data only. */
+:root {
+  --paper: #F4F1E9; --ink: #1A1A17; --thread: #2E3A8C; --warp: #8F8779;
+  --madder: #B5482F; --dyeSoft: #E7E9F4; --ink60: #5B584F; --ink40: #726D5C; --ink15: #E0DACB;
+  --display: 'Schibsted Grotesk', system-ui, sans-serif;
+  --scripture: 'Newsreader', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #D9D3C4; color: var(--ink); font-family: var(--display); }
+.mk-bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; justify-content: space-between; padding: .7rem 1.1rem; background: var(--ink); color: var(--paper); font-family: var(--mono); font-size: .8rem; }
+.mk-bar a { color: inherit; border: 1px solid currentColor; border-radius: 999px; padding: .3rem .8rem; font-size: .72rem; text-decoration: none; margin-left: .3rem; }
+.section-head { max-width: 1260px; margin: 2.2rem auto 0; padding: 0 1.5rem; font-family: var(--mono); font-size: .78rem; color: var(--ink); }
+.section-head h2 { font-family: var(--display); font-weight: 900; font-size: 1.4rem; margin: 0 0 .3rem; }
+.section-head p { margin: 0; max-width: 820px; line-height: 1.55; color: var(--ink60); }
+.mk-stage { display: flex; flex-wrap: wrap; gap: 1.6rem; padding: 1.6rem 1.5rem 2.5rem; justify-content: center; }
+.phone { width: 380px; max-width: 100%; background: var(--paper); border-radius: 30px; box-shadow: 0 18px 50px rgba(0,0,0,.16); padding: 34px 24px 30px; }
+.opt { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--thread); margin: 0 0 .3rem; }
+.optnote { font-family: var(--mono); font-size: .7rem; color: var(--ink60); line-height: 1.5; margin: 0 0 1.1rem; }
+/* knot primitives */
+.group { font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink40); margin: 14px 0 4px; }
+.row { border-top: 1px solid var(--ink15); padding: 10px 0 10px 12px; min-height: 48px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.row .s { font-size: 15px; font-weight: 600; }
+.row .st { font-family: var(--mono); font-size: 11px; color: var(--ink40); margin-top: 2px; }
+.row .st.thread { color: var(--thread); }
+.chev { color: var(--ink40); font-size: 13px; }
+.body { padding: 2px 0 14px 12px; display: grid; gap: 10px; }
+.hint { font-family: var(--mono); font-size: 12px; line-height: 18px; color: var(--ink60); margin: 0; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font-size: 13px; padding: 9px 14px; min-height: 40px; border-radius: 999px; border: 1px solid var(--ink15); background: transparent; color: var(--ink); }
+.chip.on { background: var(--dyeSoft); border-color: var(--thread); color: var(--thread); font-weight: 600; }
+.btn2 { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--ink); background: transparent; align-self: flex-start; justify-self: start; }
+.quiet { font-size: 13px; color: var(--thread); background: none; border: 0; padding: 6px 0; justify-self: start; text-decoration: underline; text-underline-offset: 3px; }
+.switch { width: 46px; height: 26px; border-radius: 13px; background: var(--warp); position: relative; flex: none; }
+.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); }
+.switch.on { background: var(--thread); } .switch.on::after { left: 23px; }
+.src { font-family: var(--mono); font-size: 11px; line-height: 16px; color: var(--ink40); }
+.src b { color: var(--thread); font-weight: 600; }
+.src.test b { color: var(--madder); }
+.tbl { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: center; font-size: 14px; }
+.tbl .k { font-weight: 600; } .tbl .k small { display: block; font-family: var(--mono); font-weight: 400; font-size: 10.5px; color: var(--ink40); }
+.seg { display: inline-flex; border: 1px solid var(--ink15); border-radius: 999px; overflow: hidden; }
+.seg span { font-size: 12px; padding: 8px 10px; min-height: 36px; display: inline-flex; align-items: center; }
+.seg span.on { background: var(--dyeSoft); color: var(--thread); font-weight: 600; }
+.sugg { border: 1px solid var(--ink15); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.sugg .t { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--thread); }
+.sugg p { margin: 0; font-size: 14px; line-height: 1.4; }
+.dim { opacity: .45; }
+/* arrival */
+.arr { padding: 6px 8px; display: grid; gap: 12px; }
+.day { font-family: var(--mono); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink40); }
+.echo { font-family: var(--scripture); font-style: italic; font-size: 19px; line-height: 28px; color: var(--ink60); }
+.ch { font-weight: 900; font-size: 34px; margin-top: 12px; }
+.prog { font-family: var(--mono); font-size: 12px; color: var(--ink40); }
+.dose { border-left: 2px solid var(--thread); padding: 2px 0 2px 12px; display: grid; gap: 4px; }
+.dose p { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 18px; color: var(--ink60); }
+.dose .quiet { padding: 4px 0; font-family: var(--display); }
+.verse { font-family: var(--scripture); font-size: 19px; line-height: 31px; margin-top: 18px; }
+.verse sup { font-family: var(--mono); font-size: 10px; color: var(--ink40); margin-right: 4px; }
+.state { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--madder); margin: 0 0 .9rem; }
+</style>
+</head>
+<body>
+<div class="mk-bar">
+  <span><strong>Experiments opt-in</strong> — where the six reading settings live, and the dose note</span>
+  <nav><a href="#a">A · Six rows</a><a href="#b">B · One panel</a><a href="#c">C · Under Experiments</a><a href="#dose">Dose note</a></nav>
+</div>
+
+<div class="section-head">
+  <h2>1 · The knot: six settings and the Experiments switch</h2>
+  <p>Knot › More › Preferences. Each direction shows the same synthetic reader. Experiments are on, E1 hold-to-seal is being tested, frequency was applied from a suggestion, and the day count was hidden by hand. The Translation and Partner rows are unchanged. "Adaptive policy" moves inside Experiments in every direction.</p>
+</div>
+<main class="mk-stage">
+
+  <!-- A -->
+  <div class="phone" id="a">
+    <p class="opt">A · Six rows in Preferences</p>
+    <p class="optnote">Each behaviour is its own disclosure row, following the existing "Sealing" pattern. Its status line shows the current value and where it came from. Experiments is one more row with a switch. This has the most rows but each one is simple.</p>
+    <div class="group">Preferences</div>
+    <div class="row"><div><div class="s">Translation</div><div class="st">World English Bible</div></div><span class="chev">▸</span></div>
+    <div class="group" style="margin-top:8px">Reading</div>
+    <div class="row"><div><div class="s">How often</div><div class="st thread">5 days a week · suggested</div></div><span class="chev">▾</span></div>
+    <div class="body">
+      <div class="chips"><span class="chip">Every day</span><span class="chip on">5 days a week</span></div>
+      <div class="src"><b>Suggested by an experiment</b>, applied 3 Nov. On 5-days weeks you sealed 4.6 days per phase, against 3.9 on daily weeks.</div>
+    </div>
+    <div class="row"><div><div class="s">What counts as read</div><div class="st">Whole sitting · default</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Sealing</div><div class="st" style="color:var(--madder)">Tap · being tested until 14 Nov</div></div><span class="chev">▾</span></div>
+    <div class="body">
+      <div class="chips"><span class="chip">Hold</span><span class="chip on">Tap</span></div>
+      <div class="src test"><b>Being tested.</b> Until 14 Nov the app alternates hold and tap every 3 weeks to see which suits you. Choosing one now ends this test.</div>
+    </div>
+    <div class="row"><div><div class="s">Streak</div><div class="st">Hidden · default</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Day count</div><div class="st">Hidden · you chose</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Sitting count</div><div class="st">Shown · default</div></div><span class="chev">▸</span></div>
+    <div class="group" style="margin-top:8px">&nbsp;</div>
+    <div class="row"><div><div class="s">Experiments</div><div class="st">On since 1 Sep · testing Sealing</div></div><span class="switch on"></span></div>
+    <div class="row"><div><div class="s">Partner</div></div><span class="chev">▸</span></div>
+  </div>
+
+  <!-- B -->
+  <div class="phone" id="b">
+    <p class="opt">B · One "How reading works" panel</p>
+    <p class="optnote">One row whose status sums it up. Opened, it shows all six as a compact list of choices with the Experiments switch at the foot. The setting values stay together, and the knot stays as short as it is today.</p>
+    <div class="group">Preferences</div>
+    <div class="row"><div><div class="s">Translation</div><div class="st">World English Bible</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">How reading works</div><div class="st">2 changed · 1 being tested</div></div><span class="chev">▾</span></div>
+    <div class="body">
+      <div class="tbl">
+        <div class="k">How often<small style="color:var(--thread)">suggested 3 Nov</small></div><div class="seg"><span>Daily</span><span class="on">5 a week</span></div>
+        <div class="k">Counts as read<small>default</small></div><div class="seg"><span class="on">Whole</span><span>Any</span></div>
+        <div class="k">Sealing<small style="color:var(--madder)">testing until 14 Nov</small></div><div class="seg"><span>Hold</span><span class="on">Tap</span></div>
+        <div class="k">Streak<small>default</small></div><div class="seg"><span>Show</span><span class="on">Hide</span></div>
+        <div class="k">Day count<small>you chose</small></div><div class="seg"><span>Show</span><span class="on">Hide</span></div>
+        <div class="k">Sitting count<small>default</small></div><div class="seg"><span class="on">Show</span><span>Hide</span></div>
+      </div>
+      <p class="hint">Changing a setting that's being tested ends that test.</p>
+      <div class="row" style="padding-left:0"><div><div class="s">Experiments</div><div class="st">Let the app test these and suggest changes</div></div><span class="switch on"></span></div>
+    </div>
+    <div class="row"><div><div class="s">Partner</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Sealing</div><div class="st">moved into How reading works</div></div><span class="chev dim">▸</span></div>
+  </div>
+
+  <!-- C -->
+  <div class="phone" id="c">
+    <p class="opt">C · Everything under Experiments</p>
+    <p class="optnote">One "Reading settings" row for the six settings. A separate Experiments row holds the switch, any suggestions waiting to be applied, the current test and the adaptive policy. Settings and research stay apart, and a suggestion can be applied later from here as well as at the seal.</p>
+    <div class="group">Preferences</div>
+    <div class="row"><div><div class="s">Translation</div><div class="st">World English Bible</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Reading settings</div><div class="st">Daily · whole sitting · tap · …</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Experiments</div><div class="st thread">On · 1 suggestion</div></div><span class="chev">▾</span></div>
+    <div class="body">
+      <div class="row" style="padding-left:0;border-top:0"><div class="hint">Let the app try small changes on you, three weeks at a time, and suggest what works. Nothing changes until you apply it.</div><span class="switch on"></span></div>
+      <div class="sugg">
+        <div class="t">Suggestion · How often</div>
+        <p>Move to 5 days a week, any 5. You sealed more days in the 5-day phases.</p>
+        <div class="chips"><span class="chip on">Apply</span><span class="chip">Keep daily</span></div>
+      </div>
+      <div class="src test"><b>Now testing: Sealing.</b> It alternates hold and tap until 14 Nov. Choosing one in Reading settings ends this test.</div>
+      <div class="src">Next: streak, day count, sitting count.</div>
+      <button class="quiet">Adaptive nudges · not active yet</button>
+    </div>
+    <div class="row"><div><div class="s">Partner</div></div><span class="chev">▸</span></div>
+  </div>
+</main>
+
+<div class="section-head">
+  <h2>1b · Experiments off: the same knot, the default for every reader</h2>
+  <p>Shown for direction A. B and C collapse the same way: no "suggested" or "testing" labels, and the switch is off with one line of explanation. The six values are still shown and still changeable.</p>
+</div>
+<main class="mk-stage">
+  <div class="phone">
+    <p class="opt">Off · direction A</p>
+    <div class="group">Reading</div>
+    <div class="row"><div><div class="s">How often</div><div class="st">Every day</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">What counts as read</div><div class="st">Whole sitting</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Sealing</div><div class="st">Hold</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Streak</div><div class="st">Hidden</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Day count</div><div class="st">Shown</div></div><span class="chev">▸</span></div>
+    <div class="row"><div><div class="s">Sitting count</div><div class="st">Shown</div></div><span class="chev">▸</span></div>
+    <div class="group" style="margin-top:8px">&nbsp;</div>
+    <div class="row"><div><div class="s">Experiments</div><div class="st">Off</div></div><span class="switch"></span></div>
+    <div class="body"><p class="hint">Turn on to let the app try these settings on you, three weeks at a time, and suggest what works. It also asks a short monthly question. Nothing changes until you apply a suggestion.</p></div>
+  </div>
+</main>
+
+<div class="section-head" id="dose">
+  <h2>2 · The dose note on the arrival screen (direction already set at grill)</h2>
+  <p>Approved in grill round 5: one line saying why the reading is shorter, plus "Read the whole chapter". It goes under the chapter title in today's ArrivalZone. When reading-screen-and-motion S06 lands, it moves to sit under that plan's "verses a–b" subline, still above "Before you read".</p>
+</div>
+<main class="mk-stage">
+  <div class="phone">
+    <p class="state">State 1 · the dose ladder after a lapse</p>
+    <div class="arr">
+      <div class="day">Saturday, October 10</div>
+      <div class="echo">After breakfast, in the kitchen.</div>
+      <div class="ch">James 4</div>
+      <div class="prog">Day 12 in James</div>
+      <div class="dose">
+        <p>A shorter reading today, 10 verses, after a few missed days. Seal a full week and it grows back.</p>
+        <button class="quiet">Read the whole chapter</button>
+      </div>
+    </div>
+    <div class="verse"><sup>1</sup>Where do wars and fightings among you come from? Don’t they come from your pleasures that war in your members?</div>
+  </div>
+  <div class="phone">
+    <p class="state">State 2 · an E10 dose day (Experiments on)</p>
+    <div class="arr">
+      <div class="day">Saturday, October 10</div>
+      <div class="echo">After breakfast, in the kitchen.</div>
+      <div class="ch">Romans 8</div>
+      <div class="prog">Day 40 in Romans</div>
+      <div class="dose">
+        <p>20 verses today. The dose experiment is trying different lengths.</p>
+        <button class="quiet">Read the whole chapter</button>
+      </div>
+    </div>
+    <div class="verse"><sup>1</sup>There is therefore now no condemnation to those who are in Christ Jesus…</div>
+  </div>
+  <div class="phone">
+    <p class="state">State 3 · after tapping it</p>
+    <div class="arr">
+      <div class="day">Saturday, October 10</div>
+      <div class="echo">After breakfast, in the kitchen.</div>
+      <div class="ch">James 4</div>
+      <div class="prog">Day 12 in James</div>
+    </div>
+    <div class="verse"><sup>4</sup>You adulterers and adulteresses, don’t you know that friendship with the world is hostility toward God?…</div>
+    <p class="optnote" style="margin-top:14px">The note goes. Today's reading becomes the rest of the chapter from the next unread verse (here v4), and the dose ladder is back at the top for tomorrow. On a full-chapter day, nothing shows at all.</p>
+  </div>
+</main>
+</body>
+</html>

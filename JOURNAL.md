@@ -5,6 +5,13 @@ changed, why, and anything the next session needs to know.
 
 ---
 
+## Decision 2026-10-10 — the experiment engine becomes opt-in; the app is a reading app first
+
+**Decision:** The research engine moves behind a single **Experiments** switch in the knot's Preferences, off by default, including on the owner's phone (a clean start; existing phase and trial rows stay in the log but are not resumed). Behind it: the six 21-day reversals, the monthly SRBAI question, phase reports and charts, the nudge-hour, post-miss and E10 trials, and the bandit. With it off, the six reversal-governed behaviours sit at today's defaults, each shown and changeable in the knot. Learning happens only from experiments while the switch is on, and a finding is only ever suggested; nothing changes until the reader taps Apply. The E9 next-day probe is removed outright, and E10 judges on sealing alone. The dose ladder stays for everyone but is no longer silent.
+**Why:** The owner couldn't tell what the probe was next to their own memory passages, and found their daily reading had shrunk to a few verses with no explanation (the silent dose ladder). Most of their misses come from life, like camping or a roster change, which the engine's in-app diagnoses and unannounced phase switches can't account for. Making it opt-in keeps the self-experiment available without imposing it on every reader.
+**Consequences:** Plain readers no longer generate randomised data, so reversal verdicts exist only for people who opt in. E10 loses its recall measure. A probe can't be brought back later without a new design pass. The notification-received listener must be built for the nudge-hour trial and bandit to learn at all.
+**Branch:** docs/experiment-suite-review
+
 ## 2026-10-09 — book bookends shipped as v0.11.0
 
 The device checklist ran on the dev client in two rounds, and the dev DB was restored byte-identical afterwards. Passed:

@@ -76,6 +76,22 @@ or opened for the reader — the sheet is the same every time. Only Support
 carries a "Needs attention" marker (and lights the gear's dot); backup state
 never does.
 
+**Experiments** — the Preferences switch that lets the app test small changes
+on the reader and suggest what works. Off by default. Everything research-shaped
+lives behind it; with it off, the app is a plain reading app.
+
+**Reversal** — an experiment that switches one behaviour of the app (such as
+reading frequency or hold-to-seal) between two settings in 21-day phases, to see
+which suits the reader. Runs only with Experiments on.
+
+**Suggestion** — what an experiment concludes, offered to the reader as a change
+to a setting with its reason. Nothing changes until the reader applies it.
+
+**Dose ladder** — how much is offered as the day's reading after a lapse: the
+full chapter, then 20 verses, 10, one. Always says so on the arrival screen, and
+reading the whole chapter returns it to the top. Not to be confused with **the
+ladder**, which belongs to cloze cards.
+
 **Preferences** — the rare tier's first group: how the app behaves for you
 (Sealing, Partner, Adaptive policy, and later Translation and Appearance). Not
 to be confused with the everyday tier's "Practice" row, which is the cue.
