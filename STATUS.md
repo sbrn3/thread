@@ -71,7 +71,8 @@ In order. Each item says what blocks it and where the details live.
       - night mode;
       - the shelf of finished books;
       - a sitting-length setting;
-      - a home-screen widget;
+      - a memory-verse widget for spaced repetition on the home screen;
+      - grade buttons in Anki's order (worst first);
       - audio.
 - [ ] 8. **Longer-running items:**
       - a cultural review of the origin context line, by someone competent in Jewish biblical practice;
