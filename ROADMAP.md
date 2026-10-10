@@ -8,19 +8,25 @@ Status key: 📋 planned · 🔨 in progress · ✅ shipped · ❄️ parked
 
 ## Planned
 
-- 🔨 **What's new after an update** — a quiet card above the reading after an
-  update, plus every note under Knot › More › About. Every user-facing release
-  tag adds a note. Plan: `docs/plans/whats-new/plan.html`.
-_(none)_
+- 📋 **Experiments become opt-in** — the research engine moves behind one
+  Experiments switch, off by default; the probe goes; the shorter reading after a
+  lapse says why and offers the whole chapter. Saved, not approved. The plan is on
+  branch `docs/experiment-suite-review` (`docs/plans/experiment-suite-review/`).
 
 ## Under consideration
 
-- 🔨 **Knot opener, settings layout and translation switch** *(#30)* — a
-  gear opener, a sheet that orders itself the same every time, backup demoted,
-  Start over and cue-save fixes, a Report a problem link, and the translation
-  switch (absorbing the parked `knot-translation-switch`). Implemented in the
-  working tree; see `docs/plans/knot-opener-icon/`. Night mode is a separate,
-  later grill.
+Each of these needs a grill and a plan before any work. The owner picks the order.
+
+- **Night mode** — a dark linen palette, following the system setting or set in
+  Preferences. Every token in `src/ui/tokens.ts` needs a dark pair, and the dyes
+  need checking for contrast.
+- **The shelf** — finished books as a row of woven bolts in the knot, each in its
+  dye, opening to its contents (headnotes). "A year of reading is a polychrome shelf."
+- **Sitting length** — a reader-set length for the day's reading, separate from
+  the dose ladder. It overlaps with the experiments opt-in plan, so decide that first.
+- **Home-screen widget** — today's reference and whether it's sealed, opening the app.
+- **Audio** — listen to the day's reading. This needs a licensed or public-domain
+  audio source, and a decision on what counts as reading for the seal.
 
 ## Parked
 
@@ -33,6 +39,15 @@ _(none)_
   Revisit only if real Apple readers appear, re-planning from current `main`.
 
 ## Shipped
+
+- ✅ 2026-10-10 — **Reading screen and motion, waves 1–2** (PRs #68, #69, `v0.12.0`).
+  - Launch fell from 13 s to 2.5 s, on a linen splash.
+  - The seal and unravel holds show progress from touch-down.
+  - Sheets slide, verse taps are fast, and italics use the bundled fonts.
+  - Waves 3–4 (Direction A and the woven motion, #72, #74) are on `main`, waiting for their device review.
+- ✅ 2026-10-09 — **Book bookends** (`v0.11.0`): BibleProject overviews, daily
+  headnotes, and the book's contents.
+- ✅ 2026-10-07 — **What's new after an update** (PR #54, `v0.10.0`).
 
 - ✅ 2026-10-07 — **Memory library in the knot** (PR #48, `v0.9.0`). See
   every memory passage; add any passage from the Bible, edit its verses, start

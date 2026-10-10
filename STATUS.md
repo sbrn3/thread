@@ -1,212 +1,111 @@
 # Status
 
-_Last updated: 2026-10-07 (What's new plan approved and built on `feat/whats-new`)_
+_Last updated: 2026-10-11, after every session was wrapped up. Run `node scripts/catch-me-up.mjs` for live branch and worktree state; this page is the plan._
 
-## Current phase
+## Where things stand
 
-Plan work-packages W1–W13 are complete. Four subsequent releases have also
-shipped and are on `main`: the **Tyndale Open Resources** addition (offline
-study notes, dictionary discovery/search, book introductions, passage-range
-remembering — tagged `v0.3.0`, then `v0.3.1` after a corpus-size fix), the
-**"The Loom" aesthetic rollout** (PRs #1–#8, tagged separately in the journal),
-**account reset as "the unravel"** (PR #9), and **app-quality-foundations**
-(fonts/safe-areas/race-safe startup, 44pt controls, operable seal, honest
-on-device recovery + external backup, a quiet knot with local Support,
-searchable reading history, and a one-time study hint — 7 stacked PRs,
-#11–#17, tagged `v0.5.0`) — see `docs/plans/README.md`.
+- **Released:** `v0.12.0` (2026-10-10). It contains:
+  - a 2.5 s launch on a linen splash;
+  - seal and unravel holds that show progress from touch-down;
+  - sliding sheets and fast verse taps;
+  - bundled italics;
+  - the device-sweep wording fixes.
 
-## Branch state
-
-`main` at `c090a25`, level with `origin/main`. Since `v0.6.0` (`25a3faf`):
-#23/#24 (`fix/launch-hang` render-path guard, then knot declutter — nested
-modals, opener affordance, everyday/rare tiers), #25 (unravel hold survives
-the sheet's ScrollView), #26 (grill skill framing), #27 (landing page
-realigned with the shipped app), #28/#29 (README reordered and trimmed), #33
-(a "Sealing" toggle in the knot so a reader can switch back from tap-to-seal
-to hold-to-seal), #34 (deterministic `catch-me-up` fact sheet,
-`scripts/catch-me-up.mjs`), and today's #35/#36/#37: the start-over control
-reshaped as a ring (#31), an edited cue actually persisting on screen (#32,
-previously silently reverting), and the knot opener clearing safe-area
-insets so its label can't clip (the other half of #30 — "should just be a
-settings icon" — is tracked in `ROADMAP.md`, not fixed here). The `v0.4.0`,
-`v0.5.0` and `v0.5.1` release notes carry a warning that those builds do not
-open.
-
-Run `node scripts/catch-me-up.mjs` for live worktree/branch state instead of
-trusting a paragraph here — it was stale for two weeks the last time someone
-hand-wrote it (see `JOURNAL.md`'s 2026-09-07 entry for what that cost).
-
-**Worktrees - check `git worktree list` before trusting any of them.**
-
-- `thread/` is on `main` and is the authoritative checkout.
-- 2026-10-07 cleanup (owner's call): the `thread-aesthetic-loom`,
-  `thread-catch-me-up`, `thread-lab-trial-integrity` and `thread-seal-fell-line`
-  worktrees, every merged branch, and the empty leftover folders were removed.
-  The uncommitted work they held was discarded on purpose: the apple-web-pwa and
-  lab-trial-integrity plans, and the unfinished lab-integrity code. Re-plan it
-  from scratch if it is ever wanted.
-- Other sessions open short-lived sibling worktrees (`thread-<topic>`) for their
-  own branches. Leave any you didn't create alone.
-
-**2026-09-07 correction (kept for the lesson):** `git fetch` updates
-remote-tracking refs, not local branch refs. `fix/knot-declutter` was branched
-from a local `main` that had never been fast-forwarded, putting it 24 commits
-behind `origin/main` and missing the whole rebrand and font bundling. Caught
-before merge by re-checking `main..origin/main`. See `JOURNAL.md`'s 2026-09-07
-entry.
-
-## The app opens again
-
-`v0.4.0` through `v0.5.1` all shipped an app that froze on its launch screen.
-`cueTerms` re-normalised each verse once per dictionary candidate (~7,900 per
-verse); with no early return a 21-verse sitting scanned the lot, blocking the
-JS thread inside a `useMemo` during `Flow`'s render. Normalising once per
-verse took that from 6222ms to 35ms. The weave kept animating throughout
-because Reanimated runs on the UI thread, and `LaunchWeave`'s stall timeout
-could never fire because `setTimeout` needs the blocked thread - so the Retry
-button that would have escaped it never appeared.
-
-The SDK 57 dependency alignment (tagged `v0.5.1`) was never the cause, but its
-device-launch gate is now satisfied along with everything else: the `v0.6.0`
-build was installed over a populated build on a Motorola edge 50 neo
-(Android 16), kept its reading history, reached the reading screen, rendered
-all three bundled typefaces, and sat idle instead of pinning a core.
-
-## Verification (Tyndale release, historical)
-
-- `npm test` - 318 passing at the time; 461 passed / 1 todo at the knot-declutter
-  merge, 462 cases today.
-- `npm run typecheck` — clean.
-- `npm run check:tyndale` — 17,477 study resources, 6,010 dictionary articles,
-  66 canonical book partitions, references, links, hashes, and notices verified.
-- Android production Metro export — clean after runtime corpus packing; compressed
-  export is 10.4 MiB and Hermes bytecode is 20.0 MB, down from 40.0 MB in v0.3.0.
-- Physical-device accessibility/startup profiling for Tyndale, and the two
-  loom device checks (Psalms/Jude widths, warp colour on a real screen), remain
-  open manual checks — no Android device or emulator available in this
-  environment.
-
-## Active plans
-
-- **reading-screen-and-motion**: ✅ built (C4). Waves 1–4 merged (#68, #69, #72, #74), plus the audit fix and docs (wave 5).
-  - Waves 1–2 shipped in `v0.12.0`: a 2.5 s launch on linen, holds that show progress, sliding sheets, fast verse taps, and bundled italics.
-  - Waves 3–4 are on main, not yet released:
-    - Direction A: a short arrival and one "Before you read" list;
+  The owner's phone runs v0.11.0 in the real app (`com.sngugi.thread`).
+- **On `main`, not released** (as of `60ed2e8`):
+  - **reading-screen-and-motion waves 3–4:**
+    - Direction A: a short arrival header and one "Before you read" list;
     - the arrival weft and stitched rows;
     - sealing weaves today's row;
     - the knot's selvedge.
-  - **Open:** the device review. The phone was busy with another session. Gaps are listed in `OUTCOME.md`. Next release: What's new lines are drafted in OUTCOME.md.
-  - See `docs/plans/reading-screen-and-motion/`.
-- **bibleproject-book-videos** — ✅ shipped in `v0.11.0` (C4; PRs #57–#64 and #66, plus the release PR). BibleProject overview links at a book's start and end. Optional daily **headnotes**, read back as the book's **contents** at "You finished" and in Reading history. Hairline headpiece/tailpiece ornaments. The README and website are refreshed. The device check passed. Export and unravel passed on the device. Restoring from file wasn't run there, and unit tests cover it. See `docs/plans/bibleproject-book-videos/OUTCOME.md`.
-- **whats-new** — 🔨 in progress (C2, approved 2026-10-07). After an update, a
-  quiet What's new card above the reading, and every note under Knot › More ›
-  About. Notes are bundled per release tag in `src/whatsNew/`, and new readers
-  never see a card. Both slices are built on `feat/whats-new`. See
-  `docs/plans/whats-new/`.
-- **recall-settings** — ✅ merged (PR #48, `7659fcd`), released in `v0.9.0`.
-  A memory library in the knot (add any passage, edit, start over, delete,
-  review now, daily cap), optional multi-pick book end, and the probe stops
-  using marks. Migration V13 is additive. Owner device check outstanding (see
-  `OUTCOME.md`). See `docs/plans/recall-settings/`.
-- **recall-cloze-ladder** — ✅ merged (PR #45, `d85f963`), released in `v0.8.0`.
-  Recall passages are cloze cards on a seven-rung ladder, and the next-day probe
-  asks about up to 3 verses you read (#40, #41). Migration V12 is additive. Owner
-  device check outstanding (see `OUTCOME.md`). See `docs/plans/recall-cloze-ladder/`.
-- **one-blue-thread-rebrand** — ✅ shipped in `v0.6.0` (PR #18, `2118227`).
-  Public name, notification title, backup filenames, onboarding, knot, website
-  and release artifact all renamed; the Android package, Expo slug, database,
-  keys and deterministic seeds are untouched, so it installs as an upgrade. The
-  repository is now `sbrn3/one-blue-thread` and the GitHub Pages URL is the
-  permanent canonical address - no domain will be registered. Numbers 15:37-41
-  ships in full from the bundled WEB text wherever the name is explained; NIV
-  remains gated on surface-complete written permission. Still open: cultural
-  review of the origin context line.
-  See `docs/plans/one-blue-thread-rebrand/plan.html`.
-
-- **app-quality-foundations** — ✅ shipped. 7 PRs (#11–#17) merged to `main`
-  in order, tagged `v0.5.0`; each independently focused-tested. See
-  `docs/plans/app-quality-foundations/plan.html`'s per-slice ledger for exact
-  gaps per PR — the device pass below remains open.
-
-- **knot-declutter** - ✅ shipped on `main` (PR #24, `3c873f8`). The knot's
-  "Reading history" and chapter rows opened nothing (a second `<Modal>` stacked
-  on an already-open one); fixed by nesting both inside the knot's own modal
-  tree. Also split the flat six-section accordion into an everyday tier (weave,
-  cue, reading history) over a "More" disclosure grouped Your data · Practice ·
-  About, with attention-promotion preserved. A follow-up, PR #25 (`e5bfc61`),
-  let the unravel hold survive the sheet's `ScrollView`. Owner device check
-  (reading history actually opens) was deferred to release by decision and is
-  still outstanding. Issues #30 and #32 were the first reader feedback on this
-  surface, both fixed today (PR #37 — knot opener label clipping; PR #36 —
-  edited cues not persisting on screen); #30's "should be a settings icon"
-  half is tracked separately in `ROADMAP.md`.
-  See `docs/plans/knot-declutter/plan.html`.
-
-- **arrival-zone-progress-display** — 🔨 implementation complete; PR open.
-  Adds `E11`/`E12` reversal experiments (day-count and sitting-count line
-  visibility in `ArrivalZone`) to the existing lab queue, appended after
-  `E3`, using the same mechanism. C2: 8 files, 2 commits landed (486
-  passed/1 todo, typecheck clean). PR #39 on
-  `feat/arrival-zone-progress-visibility`. Both experiments are inert until
-  an active phase — ~11 months out behind the existing queue.
-  See `docs/plans/arrival-zone-progress-display/plan.html`.
-
-- **knot-opener-icon** - 🔨 implemented in the working tree, not committed. Gear
-  opener, stable re-ordered knot (Preferences / Your data / About), backup
-  demoted, Start over and cue-save fixes, Report a problem link, translation
-  switch (absorbs `knot-translation-switch`). Open: owner device checks (Start
-  over hold, cue edits) and live NIV/ESV key round-trips before merging the
-  translation half. See `docs/plans/knot-opener-icon/plan.html`.
-- **seal-affordance** - ✅ merged to `main` (PR #43), included in the next release after `v0.7.0`. The seal is now the fell
-  line (outlined pill on a thread across the page) and the rail locks onto it;
-  rail fix ships first. Open: owner device checks (rail/line alignment on a
-  notched phone, hold feel, tap mode). See `docs/plans/seal-affordance/plan.html`.
+  - **#77:** a backup fix. Every second recovery snapshot failed to rotate.
+- **Saved, not approved:** the **experiments opt-in** plan (C4). It is on branch `docs/experiment-suite-review` (`b9e5866`), not on `main`.
+- **No sessions are running.** All app sessions were wrapped up on 2026-10-11. No PRs or issues are open.
 
 ## Next actions
 
-- [x] ~~Build and install a fresh APK; confirm cold launch on the Android
-      device.~~ Done 2026-09-06 on `v0.6.0` - and it found the launch hang that
-      had been shipping since `v0.4.0`.
-- [ ] Give the suite a real component renderer. PR #21 added a stand-in -
-      `test/render-path-cost.test.ts` calls what one `Flow` render calls, in
-      render order, against Psalm 119 (176 verses, the canon's worst case), and
-      was verified to fail: reintroducing the defect takes it to ~30s against a
-      2s bound. That guards this bug class, not the gap itself - nothing still
-      renders `Flow`. The obvious route to a renderer adds `react-native-web`;
-      with Apple support parked, that dependency choice is this item's own.
-- [x] Install the dev-client APK. Done 2026-10-01 and confirmed over adb on
-      2026-10-07 (`DEBUGGABLE` plus the dev launcher). How to check it and how
-      to serve it a bundle is in `AGENTS.md` → "The owner's phone".
-- [ ] One Blue Thread: cultural content review of the origin context line by
-      someone competent in Jewish biblical practice. Ticket 0 is otherwise
-      closed - no domain will be registered, and the repo is now
-      `sbrn3/one-blue-thread` with the GitHub Pages URL as the permanent
-      canonical address. NIV stays gated on written, surface-complete
-      permission; the bundled WEB passage ships.
-- [ ] One Blue Thread ticket 6 device matrix - partly done on 2026-09-06.
-      Confirmed: installs over a populated build with reading history intact,
-      and `refreshDisplayName()` ran (the boot trace logged it completing).
-      Still unchecked: the launcher name and notification shade by eye, and the
-      origin passage under Knot -> App at 200% type with a screen reader.
-- [ ] Physical-device checks: Tyndale accessibility/startup profiling; loom
-      Psalms/Jude widths and warp colour `#8F8779` on a real screen.
-- [ ] app-quality-foundations device pass: ~~bundled font assets~~ (done in
-      `v0.6.0` - three OFL variable fonts bundled and confirmed rendering on
-      device), TalkBack/VoiceOver/
-      Switch Control + 200% text matrix, real launch timing (fast/400ms/13s/
-      14s/rejected), and an on-device exercise of the real `expo-file-system`
-      recovery-snapshot move/rotation calls (PR #14 is fake-IO tested only).
-- [ ] Smoke-test `src/text/esv.ts` and `src/text/apiBible.ts` against real keys by pasting each into the knot's Translation row.
-- [ ] reading-screen-and-motion device review, waves 1 to 4, on the dev app. Every check is listed in `docs/plans/reading-screen-and-motion/OUTCOME.md` → "Remaining gaps". It includes:
-      - the cb00f1a held-seal recheck;
-      - the knot reflow;
-      - the sheet slides;
-      - a verse tap in ≤150 ms;
-      - the Direction A busy and quiet days;
-      - a one-verse seal with no scroll;
-      - the TalkBack order;
-      - the weft, the stitch, the weave and the selvedge;
-      - reduce motion (ask the owner before toggling it).
-- [ ] Tag the next release (waves 3 and 4: Direction A and the woven motion) once that review passes. The What's new lines are drafted in that OUTCOME.md. Owner's yes required.
-- [ ] Build a fresh dev-client APK (workflow_dispatch `dev-client.yml`) so the dev app shows the v0.12.0 linen splash.
-- [ ] Delete the stale `feat/reading-motion` branch on origin (95b2873). It was superseded by the `-wave1` to `-wave5` branches, which are all merged.
+In order. Each item says what blocks it and where the details live.
+
+- [ ] 1. **Find the blank white screen on `main` (it blocks any release from `main`).**
+      - **What was seen:** the dev app on a dev bundle of `743eab4` (waves 3–4) showed a full white frame. uiautomator found no nodes. Yet JS logged `launchDismissed` at 3634 ms with no errors. Metro also logged `[study] prewarm` three times; it should run once.
+      - **Comparison:** `v0.12.0`, served by the same Metro ten minutes earlier, rendered normally.
+      - **Confidence:** this was seen once and never reproduced.
+      - **How to check:** cold-start the dev app on current `main` twice. If it's blank, bisect `v0.12.0..main` (waves 3 and 4 are four merges). Fix it before anything else ships.
+      - **Not the cause:** the "SplashScreenManager not found" error in logcat comes from the old dev-client APK and appears on every launch.
+      - **Needs:** the phone, plugged in and unlocked, with the owner's OK to take the screen.
+- [ ] 2. **A patch release for the backup fix (owner's yes).** The real app has #77's bug, so every second recovery snapshot fails. `main` can't ship until item 1 is resolved.
+      - **Option:** cut `v0.12.1` from `v0.12.0` with only #77 cherry-picked, on a release branch, with a What's new entry only if the owner wants one.
+      - **Otherwise:** the fix waits for `v0.13.0`.
+- [ ] 3. **The reading-screen-and-motion device review, then tag `v0.13.0` (owner's yes).**
+      - The checklist is in `docs/plans/reading-screen-and-motion/OUTCOME.md` → "Remaining gaps".
+      - It includes rechecking cb00f1a, Direction A on a busy and a quiet day, a one-verse seal with no scroll, TalkBack order, and reduce motion (ask before toggling it).
+      - The What's new lines are drafted in that file.
+- [ ] 4. **Decide on the experiments opt-in plan (owner).** Why it exists: the owner couldn't tell the probe from their own memory passages, and the day's reading had shrunk to a few verses without explanation. Read `docs/plans/experiment-suite-review/plan.html` on its branch, then approve, change or drop it.
+      - What it does:
+     - the research engine goes behind one Experiments switch, off by default;
+     - the probe is removed from "Before you read";
+     - the shorter reading after a lapse says why, and offers "Read the whole chapter";
+     - nudge delivery is recorded.
+      - **If approved:**
+     - rebase its branch onto `main` first, because its exec.md predates waves 3–4 landing;
+     - its release becomes `v0.14.0` if `v0.13.0` ships first;
+     - it changes notification scheduling, so its mandatory device checklist must pass before its tag.
+- [ ] 5. **Owner device checks still open from earlier releases.** These need the phone and the owner's hands. The sweep session's results are in each plan's PROGRESS.md (#70).
+      - **recall-cloze-ladder:** cloze card wrapping, the narrowed probe, TalkBack.
+      - **recall-settings:** the memory library actions, the daily cap, the book-end multi-pick.
+      - **knot-opener-icon:** the Translation row and the Report a problem link. Live NIV/ESV keys are a separate item below.
+      - **seal-affordance:** rail and line alignment on the punch-hole camera.
+      - **app-quality-foundations:**
+     - the TalkBack plus 200% text matrix;
+     - real launch timing;
+     - the on-device recovery snapshot (now with #77).
+      - **API-key help** (`src/ui/KeyGuide.tsx`, 1dd4325): the links open the right pages, and onboarding step 4 fits a small phone.
+      - **Licensed translations:** smoke-test `src/text/esv.ts` and `src/text/apiBible.ts` with real keys in the knot's Translation row.
+      - **Ticket 6 matrix:** the launcher name and notification shade by eye, and the origin passage at 200% type with a screen reader.
+      - **Loom:** Psalms and Jude widths, and the warp colour `#8F8779` on a real screen.
+- [ ] 6. **Housekeeping.** Do these any time; none of them needs the phone.
+      - Install the fresh dev-client APK built from `main` (Actions run 38034971708). The installed dev client predates `expo-splash-screen`, so it can't show the splash.
+      - Delete the stale `origin/feat/reading-motion` (95b2873) and the merged remote branches. This needs the owner's yes; it can't be undone.
+      - Bring the `thread/` checkout up to `main`. It sits at `f05cd0d`; its one uncommitted journal entry is now on `main`.
+- [ ] 7. **Not yet planned.** These need a grill or plan first, and the owner picks the order. See `ROADMAP.md` → Under consideration.
+      - night mode;
+      - the shelf of finished books;
+      - a sitting-length setting;
+      - a home-screen widget;
+      - audio.
+- [ ] 8. **Longer-running items:**
+      - a cultural review of the origin context line, by someone competent in Jewish biblical practice;
+      - a real component renderer for the test suite (it would add `react-native-web`, which is that item's own decision).
+
+## Sessions and worktrees
+
+- **One session drives the phone at a time** (AGENTS.md → "The owner's phone"). Check `adb reverse --list` first, ask the owner before taking the screen, and never open the release app.
+- **Worktrees on 2026-10-11:**
+  - `thread/`: the main checkout, behind `main` (see item 6).
+  - `thread-reading-motion/`: on a docs branch; it can be removed once that branch is merged.
+  - `thread-experiment-suite-review/`: holds the saved plan's branch, committed and pushed.
+- Sessions open short-lived sibling worktrees (`thread-<topic>`) for their own branches. Leave any you didn't create alone, and commit before you stop. An uncommitted plan was nearly lost when its session closed (2026-10-11).
+- **2026-09-07 lesson (kept):** `git fetch` updates remote-tracking refs, not local branches. Branch from `origin/main`, not from a local `main` that was never fast-forwarded.
+
+## Active plans
+
+Keep this list and `docs/plans/README.md` in sync.
+
+- **reading-screen-and-motion** — ✅ built (C4). Waves 1–2 in `v0.12.0`; waves 3–4 on `main`, unreleased. Open: next actions 1 and 3.
+- **experiment-suite-review** — 📋 saved, not approved (C4), on branch `docs/experiment-suite-review`. Open: next action 4.
+- **bibleproject-book-videos** — ✅ shipped `v0.11.0`. Open: restore from file on a device (unit-tested).
+- **whats-new** — ✅ shipped `v0.10.0`.
+- **recall-settings** — ✅ shipped `v0.9.0`. Open: device checks (next action 5).
+- **recall-cloze-ladder** — ✅ shipped `v0.8.0`. Open: device checks (next action 5).
+- **seal-affordance** — ✅ shipped `v0.8.0`. Open: device checks (next action 5).
+- **knot-opener-icon** — ✅ shipped `v0.7.0`. Open: device checks (next action 5).
+- **arrival-zone-progress-display** — ✅ shipped `v0.7.0`. E11/E12 are queued behind the lab's existing phases.
+- **knot-declutter** — ✅ shipped `v0.6.1`.
+- **one-blue-thread-rebrand** — ✅ shipped `v0.6.0`. Open: cultural review (next action 8).
+- **app-quality-foundations** — ✅ shipped `v0.5.0`. Open: device matrix (next action 5).
+
+## History (kept for reference)
+
+**The app opens again (2026-09-06).** `v0.4.0` through `v0.5.1` froze on the launch screen. `cueTerms` re-normalised each verse once per dictionary candidate inside `Flow`'s render. Fixed in `v0.6.0`: 6222 ms became 35 ms. The same function was again the cause of the 13 s launch fixed in `v0.12.0`, where it now uses pre-normalised aliases. See `JOURNAL.md`.
+
+**Verification (Tyndale release).** `npm run check:tyndale` verifies 17,477 study resources and 6,010 dictionary articles. The compressed Android export is 10.4 MiB.
