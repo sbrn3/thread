@@ -24,7 +24,23 @@ Each of these needs a grill and a plan before any work. The owner picks the orde
   dye, opening to its contents (headnotes). "A year of reading is a polychrome shelf."
 - **Sitting length** — a reader-set length for the day's reading, separate from
   the dose ladder. It overlaps with the experiments opt-in plan, so decide that first.
-- **Home-screen widget** — today's reference and whether it's sealed, opening the app.
+- **Memory-verse widget** *(owner, 2026-10-11)* — spaced repetition on the home
+  screen. It shows a due memory passage as a cloze card, and the reader reveals and
+  grades it without opening the app. It reuses the memory library's schedule
+  (`src/memory/`) and the cloze ladder. Grades from the widget must land in the
+  same schedule as grades in the app.
+  - Open questions: whether a widget grade counts toward the daily cap and the
+    `recall_shown` event; how much of a passage fits; and Android widget support
+    in Expo, which probably needs a config plugin or a native module.
+  - It replaces the earlier idea of a widget showing today's reference.
+- **Grade buttons in Anki's order** *(owner, 2026-10-11)* — recall cards and the
+  probe show **Held it · Partly · Lost it**, best first
+  (`src/flow/RecallZone.tsx`, `src/flow/ProbeZone.tsx`). Anki, which the owner
+  knows, runs worst first: **Again · Hard · Good · Easy**. Reversing the order to
+  **Lost it · Partly · Held it** would match that habit.
+  - Small, but it touches muscle memory, and the probe is part of E9. Check
+    whether the experiments opt-in plan (which removes the probe) lands first.
+  - Note that Anki has four grades; this app has three.
 - **Audio** — listen to the day's reading. This needs a licensed or public-domain
   audio source, and a decision on what counts as reading for the seal.
 
